@@ -1,4 +1,4 @@
-export class MathEngine {
+export default class MathEngine {
     
     static answers_list: number[] = [];
     static ADD_SUB_MAX = 999;   //Maximum of 1 component in the problem 
@@ -40,6 +40,8 @@ export class MathEngine {
         let a: number = 0;      //One number of the problem
         let b: number = 0;      //Another number of the problem
         let c: number = 0;      //The answer to the subtraction problem
+        let d: number = 0;      //The larger number of the problem
+        let e: number = 0;      //The smaller number of the problem
 
         let duplicate = true;
         while (duplicate) {    //If c is in answers_list, tries again
@@ -51,8 +53,8 @@ export class MathEngine {
                 this.ADD_SUB_MIN + 1)) + this.ADD_SUB_MIN;
 
             //Find the maximum and minimum to prevent negative numbers
-            let d = Math.max(a,b);
-            let e = Math.min(a,b);
+            d = Math.max(a,b);
+            e = Math.min(a,b);
             
             c = d - e;  
 
@@ -62,21 +64,27 @@ export class MathEngine {
         this.answers_list.push(c); 
         //Add the answer to answers_list to prevent duplicates
         
-        return {a, b, c};
+        return {a: d, b: e, c};
     }
 
-    //Randomly pick addition or subtraction
-    public static add_or_sub(): {a: number, b: number, c: number} {
+    //Randomly pick addition or subtraction, append add or sub to notify the 
+    //receiver what was picked
+    public static add_or_sub(): {a: number, b: number, c: number, d: string} {
         let x = Math.random();
         if (x < 0.5) {
-            return this.add();
+            return {...this.add(), d: "add"};
         } else {
-            return this.sub();
+            return {...this.sub(), d:"sub"};
         }
     }
 
     //For testing, I don't think answers will be needed during runtime
     public static answers() {
         return this.answers_list;
+    }
+
+    //Reset the this.answers_list to point to a new empty array
+    public static reset() {
+        this.answers_list = [];
     }
 }
