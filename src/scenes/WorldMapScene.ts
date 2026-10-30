@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { createTextButton } from '../ui/components/createTextButton';
 
 export class WorldMapScene extends Phaser.Scene {
   constructor() {
@@ -6,6 +7,19 @@ export class WorldMapScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Back to Main Menu button
+    createTextButton(
+      this,
+      '← Back to Main Menu',
+      180,
+      50,
+      () => {
+        this.scene.start('MainMenu');
+      },
+      240,
+      { variant: 'secondary', height: 44 },
+    );
+
     this.add.text(640, 160, 'World Map', {
       fontFamily: 'Arial',
       fontSize: '48px',
