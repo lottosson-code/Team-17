@@ -23,6 +23,7 @@
     "vite.config.ts",
     "main menu/**/*.ts",
     "map/**/*.ts",
-    "pause menu/**/*.ts"
+    "pause menu/**/*.ts",
+    "assets/**/*.ts"
   ]
 }

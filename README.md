@@ -1,54 +1,65 @@
 # Team 17 — Math RPG and UI Modules
 
-This repository contains the team's Phaser game and three reusable TypeScript UI design modules: **Main Menu**, **Map**, and an independent **Pause Menu**. This root README is the single documentation entry for their public interfaces, routes, layout settings and artwork.
+The actual game entry now uses the latest **Main Menu**, **Map** and independent **Pause Menu** modules. This is the single English README for their interfaces, shared artwork, layout settings and host-model wiring.
 
 ## Repository layout
 
 ```text
 Team-17/
 ├── README.md
-├── package.json, package-lock.json
-├── tsconfig.json, tsconfig.ui.json, vite.config.ts
-├── src/                    Existing Phaser scenes, math logic and tests
-├── main menu/              Main menu, menu/map navigation and assets
-├── map/                    Classroom/island map, route graph and assets
-└── pause menu/             Independent transparent CSS blackboard window
+├── assets/
+│   ├── index.ts                  Static URL registry used by Vite and the modules
+│   ├── main-menu/classroom.png    Empty night-classroom background
+│   ├── characters/*.png          Seven independent transparent monsters
+│   ├── icons/map.svg
+│   └── map/*.png                 Classrooms, dream, island atlas and bridge
+├── main menu/                    Current menu, character layout and map navigation
+├── map/                          Current classrooms/islands and route graph
+├── pause menu/                   Independent transparent CSS blackboard window
+├── src/
+│   ├── main.ts                   Actual application entry and stylesheet imports
+│   ├── scenes/MainMenuScene.ts   Mounts the latest menu/map modules
+│   ├── scenes/CombatScene.ts     Existing gameplay stage plus pause integration
+│   ├── ui/sceneOverlay.ts        Canvas-aligned DOM host and lifecycle cleanup
+│   └── ui/levelSelection.ts      Stable UI IDs -> gameplay selection metadata
+├── scripts/build-ui.mjs          Standalone build with styles and shared artwork
+└── package.json, package-lock.json, tsconfig.json, tsconfig.ui.json, vite.config.ts
 ```
 
-The three UI modules are source designs for the host game model to integrate through callbacks. The existing entry point in src/main.ts and the team's Phaser scenes remain unchanged; the new DOM-based modules are not automatically mounted by that entry point. Render them in a sized HTML overlay outside the Phaser canvas when integrating them.
+The previous WorldMapScene/LevelSelectScene and unused placeholder button helper have been removed. No browser demo, alternate art versions or process records are included in the game module directories. Dependencies and generated builds remain Git-ignored.
 
 ## Install, run and validate
 
-Use Node.js 22.12 or newer (the repository's .nvmrc selects Node 22). From the repository root:
+Use Node.js 22.12 or newer (the repository's .nvmrc selects Node 22). Run the real game from this repository root:
 
 ```sh
 npm ci
 npm run dev
 ```
 
+The startup screen displays Math Nightmare over the current empty classroom plus seven independent character layers. New Game, Continue and Map open the latest classroom selection. This current host adapter does not implement persistent saves; Continue reopens the map. Main-menu Settings/Quit Game remain host callback extension points. Selecting an island starts the project's gameplay scene with classroom/main-level/minigame metadata. During gameplay, Pause or Escape opens the independent pause window; Resume, Restart and Quit to Menu are wired. Pause Settings is disabled until the game supplies a settings screen.
+
 | Script | Purpose |
 |---|---|
-| `npm test` | Run the existing Vitest tests. |
-| `npm run typecheck` | Type-check the application and all three UI modules. |
-| `npm run typecheck:ui` | Type-check the three UI modules independently. |
-| `npm run build` | Type-check everything and produce the existing Vite application in dist/. |
-| `npm run build:ui` | Emit standalone UI ES modules, declarations and source maps beside the TypeScript sources. |
-| `npm run preview` | Serve the built application. |
-| `npm run test:watch` | Run the existing tests in watch mode. |
+| `npm test` | Run existing math tests and UI/gameplay selection-mapping tests. |
+| `npm run typecheck` | Type-check the application, UI modules and asset registry. |
+| `npm run typecheck:ui` | Type-check the standalone UI modules and shared asset registry. |
+| `npm run build` | Build the real Vite game, including the current UI and root artwork. |
+| `npm run build:ui` | Build standalone UI modules, declarations, source maps, styles and artwork in dist/ui/. |
+| `npm run preview` | Serve the production game build. |
+| `npm run test:watch` | Run tests in watch mode. |
 
-The UI modules add no runtime dependency. The repository retains its existing Phaser, Vite, TypeScript and Vitest packages and lockfile. UI-generated .js, .d.ts and .js.map files are ignored by Git and recreated with build:ui; CSS and artwork remain beside the sources. TypeScript source imports intentionally use .js suffixes for emitted browser modules. JavaScript imports do not load CSS automatically. This handoff supports serving the emitted UI modules as standalone static ES modules over HTTP with their sibling folders, CSS and artwork preserved; do not open them through file://.
+The UI adds no third-party runtime dependency. Existing Phaser/Vite/TypeScript/Vitest dependencies and lockfile are retained. Standalone generated .js/.d.ts/.js.map files are isolated in dist/ui/ and ignored by Git. Source folders stay TypeScript-only so old generated JavaScript cannot shadow edited source. TypeScript imports keep .js suffixes for emitted browser modules. JavaScript imports do not load CSS automatically. The application imports all required CSS in src/main.ts.
 
-### Standalone delivery and Vite integration
+For standalone delivery, serve the contents of dist/ui/: the three emitted module directories plus their sibling assets/ directory together over HTTP. Do not open browser modules with file://. All root artwork URLs are statically analyzable and work in the Vite application build without the old dynamic-map-URL workaround.
 
-`npm run build:ui` emits the standalone UI files in place. Deploy the three module directories, including the emitted JavaScript, CSS and assets, together beside the host application's HTML/module entry. The relative imports and artwork URLs then resolve within those directories. The root `npm run build` builds the existing Phaser/Vite application; it does not automatically copy these unused standalone UI directories into dist/.
+## Game model and lifecycle wiring
 
-Before importing `createGameUI` or `createMap` directly into the Vite application bundle, adapt the map's asset handling. The current map helper uses `new URL('./assets/' + name, import.meta.url)`, which Vite cannot statically rewrite for the classroom, dream and bridge images. A bundler integration must use statically analyzable asset URLs/imports, or provide an explicit copy/URL strategy that preserves the module-relative layout. That adaptation is host integration work and is not applied by this source-design handoff. The static main-menu image URLs and island CSS atlas URL do not remove this requirement for the other map assets.
+MainMenuScene mounts createGameUI in a DOM host aligned with the actual FIT-scaled Phaser canvas. The host observes canvas/container resizing and disposes when its owning scene shuts down. Empty overlay areas let pointer events reach the canvas; actual UI roots/buttons opt into pointer events.
 
-## Phaser integration boundary
+The tested toGameplaySelection adapter maps classroom-01/02/03 to module IDs 1/2/3. Nodes 1..5 become activity: 'level' with levelId 1..5. Nodes 6..8 become activity: 'minigame' with levelId 1..3. selectionId retains the stable string ID. Unsupported rooms, node numbers and inconsistent IDs are rejected. This routes correct metadata; the team's current CombatScene remains the gameplay implementation and a dedicated minigame model can be attached later.
 
-The current Phaser scenes use numeric moduleId/levelId values. The UI map returns stable strings such as classroom-02-level-06 plus levelNumber. The game's adapter must map classroom-01/02/03 to the appropriate game modules. Nodes 1..5 are main levels; nodes 6..8 are Minigame 1..3 and require the game's minigame destination rather than blindly treating them as ordinary levels. The UI does not define the game's save, progression, loading or minigame model.
-
-When adding the DOM overlay, suspend game-model input while pause/settings are open and destroy UI controllers when unloading their owner scene. The examples below show host-side contracts; implement or adapt those contracts in the real game's scene manager.
+Pause operates independently of main-menu/map navigation. Its host pauses/resumes the Phaser scene, restarts the current selection, or returns to MainMenu. Window/resize/key listeners and DOM hosts are cleaned up on scene shutdown. The generic examples below remain available for replacing these adapters with the final game model.
 
 ## Public entry points and CSS
 
@@ -107,8 +118,9 @@ The component appends to the host without clearing its other children. The host 
 | `MainMenuOptions` field | Type and behavior |
 |---|---|
 | `title` | Optional heading string. |
-| `backgroundUrl` | Optional replacement for `main menu/assets/classroom.png`. |
-| `mapIconUrl` | Optional replacement for `main menu/assets/map.svg`. |
+| `backgroundUrl` | Optional replacement for `assets/main-menu/classroom.png`. |
+| `mapIconUrl` | Optional replacement for `assets/icons/map.svg`. |
+| `characters` | `readonly MenuCharacter[]`; independent transparent foreground sprites. Defaults to the seven current characters; `[]` renders only the clean background. |
 | `labels` | `Partial<MenuLabels>`; override `newGame`, `continue`, `settings`, `quit`, `map`, `navigation`, `error`. |
 | `layout` | `Partial<MenuLayout>`; percentage values from 0 to 100, listed below. |
 | `theme` | `Partial<MenuTheme>`; colors/fonts listed below. |
@@ -141,6 +153,16 @@ The host implements the action destinations shown in the navigation diagram. Wit
 | `setVisible(visible)` | Show/hide the UI; does not pause/resume a game model. |
 | `focus(action?)` | Focus the requested enabled action, defaulting to `continue`; fall back to the first enabled action. |
 | `destroy()` | Abort the pending action, remove listeners and this root; safe to repeat. |
+
+## Independent foreground characters
+
+Source: [characters.ts](./main%20menu/characters.ts). The empty background and seven figures are different PNG files. No creature is painted into the classroom plate.
+
+`DEFAULT_MENU_CHARACTERS` is exported from the main-menu entry. Each `MenuCharacter` contains `id: string`, `imageUrl: string`, `x: number`, `y: number`, `width: number` and optional `idle: boolean`. Coordinates are percentages of the full 16:9 menu scene: x is horizontal center, y is the sprite's bottom/foot anchor, and width is image width. Change the default composition in characters.ts, or supply MainMenuOptions.characters. With createGameUI, supply the same data through options.menu.characters.
+
+For a standalone main-menu controller, update({ characters: nextList }) replaces the character composition without changing buttons or callbacks. Pass characters: [] for the empty classroom alone. Character elements expose data-character-id; the host can target the image within that element for animation. Set idle: false when the model owns motion. The default small CSS idle motion honors prefers-reduced-motion. The decorative layer never intercepts clicks.
+
+All seven images use real transparent alpha. They are still sprites rather than frame-by-frame animation sheets, so a game can animate their position, scale or rotation independently.
 
 ## Combined main menu and map interface
 
@@ -250,7 +272,7 @@ Mount this independently during gameplay. Give its host `position: relative`, `a
 
 Unconnected pause buttons bounce and record their action without navigation. `lastAction` is also exposed as `element.dataset.lastAction`. A connected asynchronous handler locks all four actions until settled. Rejections unlock controls, update an accessible status and emit `pausemenu:error` with `{ error, action }`; use `onError` for visible host error handling. A throwing error reporter is contained. Do not resume or replace the gameplay model while a restart/quit action is pending; destroy the controller when leaving the scene.
 
-The window supports Tab/Shift+Tab, arrow keys, Home/End, native Enter/Space activation, and Escape requesting Resume. Events are handled inside this root, not by a document listener. The host must suspend gameplay keyboard handlers while paused and stop the opening Escape event from also closing the window. Use one active pause dialog. Reduced-motion preferences disable its bounce animation.
+The window supports Tab/Shift+Tab, arrow keys, Home/End, native Enter/Space activation, and Escape requesting Resume. Repeated Escape keydown events are consumed without requesting Resume again; the host's Escape opener must also ignore event.repeat, as CombatScene does. Events are handled inside this root, not by a document listener. The host must suspend gameplay keyboard handlers while paused and stop the opening Escape event from also closing the window. Use one active pause dialog. Reduced-motion preferences disable its bounce animation.
 
 ### Pause size and position
 
@@ -393,20 +415,29 @@ Pass `#game-overlay` to `mountPauseWindow`, connect its `open()` to the game's P
 
 ## Asset inventory and exact consumers
 
-Keep these six runtime artwork files in their current module-relative locations. PNGs are the generated scene/sprite artwork; map.svg is the vector Map icon. The map classroom image is different from the main-menu classroom image despite the similar names.
+The repository has one shared root assets/ directory. It contains only the current selected artwork and its static URL registry; superseded module-local image copies and the old composite monster background have been removed from this project.
 
-| File | Dimensions | Content / where it appears | Runtime consumer |
+| File | Dimensions | Content | Runtime consumer |
 |---|---|---|---|
-| [main menu/assets/classroom.png](./main%20menu/assets/classroom.png) | 1672 x 941 | Night classroom and stationery monsters behind the main menu. | `main-menu.ts`: `defaultBackground` -> background image `src`; replace through `backgroundUrl`. |
-| [main menu/assets/map.svg](./main%20menu/assets/map.svg) | SVG viewBox 100 x 72 | Folded-map icon on the main-menu Map button. | `main-menu.ts`: `defaultMap` -> map icon `src`; replace through `mapIconUrl`. |
-| [map/assets/classrooms.png](./map/assets/classrooms.png) | 1672 x 941 | Three-classroom selection scene; all rooms are in this single image. | `map.ts`: `showRooms()` -> background `src`. Classroom hit areas are in map.css. |
-| [map/assets/dream.png](./map/assets/dream.png) | 1672 x 941 | Background behind each classroom's floating islands. | `map.ts`: `showIslands()` -> background `src`. |
-| [map/assets/islands.png](./map/assets/islands.png) | 1959 x 803 | Horizontal atlas containing five floating-island designs. The branch reuses the first three. | `map.css`: `.cse-map__sprite` background with `background-size: 500% auto`; `map.ts` selects positions using `spriteIndex * 25%` from layout.ts. |
-| [map/assets/bridge.png](./map/assets/bridge.png) | 2172 x 724 | One transparent bridge sprite reused behind every route connection. | `map.ts`: `appendBridges()` creates SVG image elements, rotates and sizes the sprite for MAP_CONNECTIONS. |
+| [assets/main-menu/classroom.png](./assets/main-menu/classroom.png) | 1672 x 941 | Empty night classroom, with no monsters. | assets/index.ts -> main-menu.ts background |
+| [assets/icons/map.svg](./assets/icons/map.svg) | SVG viewBox 100 x 72 | Folded-map icon. | assets/index.ts -> main-menu.ts Map button |
+| [assets/map/classrooms.png](./assets/map/classrooms.png) | 1672 x 941 | Three-classroom selection scene. | assets/index.ts -> map.ts showRooms() |
+| [assets/map/dream.png](./assets/map/dream.png) | 1672 x 941 | Floating-island background. | assets/index.ts -> map.ts showIslands() |
+| [assets/map/islands.png](./assets/map/islands.png) | 1959 x 803 | Five-island horizontal atlas; branch reuses sprites 0..2. | map.css background URL; layout.ts sprite selection |
+| [assets/map/bridge.png](./assets/map/bridge.png) | 2172 x 724 | Transparent bridge reused by all seven graph edges. | assets/index.ts -> map.ts appendBridges() |
+| [assets/characters/charcoal-book.png](./assets/characters/charcoal-book.png) | 1247 x 1261 | Charcoal book with worn gold trim and suspicious eyes. | characters.ts -> character id charcoal-book |
+| [assets/characters/small-eraser.png](./assets/characters/small-eraser.png) | 1212 x 1297 | Small nervous dirty-ivory eraser. | characters.ts -> character id small-eraser |
+| [assets/characters/pencil.png](./assets/characters/pencil.png) | 1174 x 1339 | Worn ochre pencil with red eraser and sly grin. | characters.ts -> character id pencil |
+| [assets/characters/triangle-ruler.png](./assets/characters/triangle-ruler.png) | 1225 x 1284 | Grumpy triangular set-square ruler. | characters.ts -> character id triangle-ruler |
+| [assets/characters/red-book.png](./assets/characters/red-book.png) | 1287 x 1222 | Red book with skeptical eyes and worn gold trim. | characters.ts -> character id red-book |
+| [assets/characters/pencil-sharpener.png](./assets/characters/pencil-sharpener.png) | 1351 x 1164 | Dark steel sharpener with blade channel and screw. | characters.ts -> character id pencil-sharpener |
+| [assets/characters/large-eraser.png](./assets/characters/large-eraser.png) | 1320 x 1192 | Larger anxious seated dirty-ivory eraser. | characters.ts -> character id large-eraser |
 
-The pause board, wood frame, straps, chalk and eraser are drawn entirely in [pause-menu.css](./pause%20menu/pause-menu.css); there is **no pause PNG or icon to load**. Game titles, buttons, room names and level labels are DOM text, not baked into the image files.
+The seven character PNGs have transparent backgrounds and can be loaded independently of the classroom. The background plate is opaque and has no monsters. The pause blackboard/frame/straps/chalk/eraser are drawn in pause-menu.css and need no image file.
 
-Main-menu image URLs use literal `new URL('./assets/...', import.meta.url)` calls; the map helper constructs its filename dynamically as described in the Vite integration section. The island atlas URL is relative to map.css. If replacing an atlas or rearranging room art, update sprite positions, classroom hit areas and island polygons with the artwork. Do not move the assets to a global folder without updating their consumers.
+All TypeScript artwork URLs are explicit static new URL literals in assets/index.ts, allowing Vite to emit them. The island atlas CSS URL is relative to map.css and points to ../assets/map/islands.png. The actual startup imports the UI styles and mounts the modules, so the application build now includes these assets. For standalone deployment, run build:ui and serve dist/ui/, which already contains assets/ beside main menu/, map/ and pause menu/.
+
+If replacing an atlas or rearranging room art, update sprite positions, classroom hit areas and island polygons with it. Do not introduce another module-local assets copy.
 
 ## Editing guide and design constraints
 
@@ -416,6 +447,7 @@ Main-menu image URLs use literal `new URL('./assets/...', import.meta.url)` call
 | Map titles, Level and Minigame labels | map/labels.ts. |
 | Pause title/button labels | pause menu/labels.ts, or options overrides. |
 | Main-menu position and colors | MainMenuOptions.layout/theme and main-menu.css. |
+| Character images, positions and motion | Root assets/characters/, assets/index.ts and main menu/characters.ts; MainMenuOptions.characters overrides. |
 | Map coordinates, hit polygons, sprite choices, routes | map/layout.ts; classroom hit areas and visual styling in map.css. |
 | Pause size, location, spacing and colors | Annotated pause-menu.css; theme overrides for colors/fonts. |
 | Game destinations and gameplay loading | The host adapters and game model, not the artwork/UI components. |

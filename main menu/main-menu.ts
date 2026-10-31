@@ -1,8 +1,10 @@
 import { MENU_ACTIONS } from './types.js';
-import type { MainMenuController, MainMenuOptions, MenuAction, MenuActionContext, MenuCallbacks, MenuLabels, MenuLayout, MenuTheme } from './types.js';
+import { ASSETS } from '../assets/index.js';
+import { DEFAULT_MENU_CHARACTERS } from './characters.js';
+import type { MainMenuController, MainMenuOptions, MenuAction, MenuActionContext, MenuCallbacks, MenuLabels, MenuLayout, MenuTheme, MenuCharacter } from './types.js';
 
-const defaultBackground = new URL('./assets/classroom.png', import.meta.url).href;
-const defaultMap = new URL('./assets/map.svg', import.meta.url).href;
+const defaultBackground = ASSETS.mainMenuBackground;
+const defaultMap = ASSETS.mapIcon;
 // placeholder：Default game title; the host can override options.title.
 const defaultTitle = 'Math Nightmare';
 const defaultLabels: MenuLabels = {
@@ -41,6 +43,7 @@ export function createMainMenu(container: HTMLElement, options: MainMenuOptions 
 class MainMenu implements MainMenuController {
   readonly element: HTMLElement;
   private readonly background: HTMLImageElement;
+  private readonly characterLayer: HTMLDivElement;
   private readonly title: HTMLHeadingElement;
   private readonly navigation: HTMLElement;
   private readonly mapIcon: HTMLImageElement;
@@ -65,6 +68,10 @@ class MainMenu implements MainMenuController {
     this.background.alt = '';
     this.background.draggable = false;
     this.background.fetchPriority = 'high';
+
+    this.characterLayer = doc.createElement('div');
+    this.characterLayer.className = 'cse-main-menu__characters';
+    this.characterLayer.setAttribute('aria-hidden', 'true');
 
     this.title = doc.createElement('h1');
     this.title.className = 'cse-main-menu__title';
@@ -100,7 +107,7 @@ class MainMenu implements MainMenuController {
     this.status.setAttribute('role', 'status');
     this.status.setAttribute('aria-live', 'polite');
 
-    this.element.append(this.background, this.title, this.navigation, mapButton, this.status);
+    this.element.append(this.background, this.characterLayer, this.title, this.navigation, mapButton, this.status);
     this.update(options);
     this.element.addEventListener('click', this.handleClick);
     this.element.addEventListener('keydown', this.handleKeydown);
@@ -123,6 +130,9 @@ class MainMenu implements MainMenuController {
     this.navigation.setAttribute('aria-label', this.labels.navigation);
     this.background.setAttribute('src', this.options.backgroundUrl ?? defaultBackground);
     this.mapIcon.setAttribute('src', this.options.mapIconUrl ?? defaultMap);
+    if (patch.characters !== undefined || this.characterLayer.childElementCount === 0) {
+      this.renderCharacters(this.options.characters ?? DEFAULT_MENU_CHARACTERS);
+    }
     for (const action of MENU_ACTIONS) {
       if (action === 'map') this.mapLabel.textContent = this.labels.map;
       else this.buttons.get(action)!.textContent = this.labels[action];
@@ -134,6 +144,27 @@ class MainMenu implements MainMenuController {
       if (value !== undefined) this.element.style.setProperty(themeVariables[key as keyof MenuTheme], value);
     }
     this.refreshDisabledState();
+  }
+
+  private renderCharacters(characters: readonly MenuCharacter[]): void {
+    const doc = this.element.ownerDocument;
+    this.characterLayer.replaceChildren();
+    characters.forEach((character, index) => {
+      const anchor = doc.createElement('span');
+      anchor.className = 'cse-main-menu__character';
+      anchor.dataset.characterId = character.id;
+      anchor.dataset.idle = String(character.idle !== false);
+      anchor.style.left = character.x + '%';
+      anchor.style.top = character.y + '%';
+      anchor.style.width = character.width + '%';
+      anchor.style.setProperty('--character-index', String(index));
+      const image = doc.createElement('img');
+      image.src = character.imageUrl;
+      image.alt = '';
+      image.draggable = false;
+      anchor.append(image);
+      this.characterLayer.append(anchor);
+    });
   }
 
   setCallbacks(callbacks: MenuCallbacks): void {

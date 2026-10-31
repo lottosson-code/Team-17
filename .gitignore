@@ -16,3 +16,6 @@ coverage/
 /pause menu/*.js
 /pause menu/*.js.map
 /pause menu/*.d.ts
+/assets/*.js
+/assets/*.js.map
+/assets/*.d.ts

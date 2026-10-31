@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:ui": "tsc -p tsconfig.ui.json",
+    "build:ui": "node scripts/build-ui.mjs",
     "typecheck:ui": "tsc --noEmit -p tsconfig.ui.json"
   },
   "engines": {

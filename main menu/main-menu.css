@@ -42,6 +42,15 @@
   pointer-events: none;
   user-select: none;
 }
+/* Foreground sprites use separate transparent PNGs. Position/size come from MenuCharacter. */
+.cse-main-menu__characters { position: absolute; inset: 0; pointer-events: none; user-select: none; }
+.cse-main-menu__character { position: absolute; display: block; transform: translate(-50%, -100%); }
+.cse-main-menu__character img { display: block; width: 100%; height: auto; filter: drop-shadow(0 .3cqw .25cqw #090e0bcc); }
+.cse-main-menu__character[data-idle='true'] img {
+  animation: menu-character-idle 4.8s ease-in-out infinite alternate;
+  animation-delay: calc(var(--character-index) * -.63s);
+}
+@keyframes menu-character-idle { from { transform: translateY(0); } to { transform: translateY(-.26cqw); } }
 .cse-main-menu__title {
   position: absolute;
   top: var(--menu-title-top);
@@ -178,6 +187,7 @@
 }
 .cse-main-menu__status:empty { display: none; }
 @media (prefers-reduced-motion: reduce) {
+  .cse-main-menu__character img { animation: none !important; }
   .cse-main-menu__button,
   .cse-main-menu__map,
   .cse-main-menu__map-label { transition: none; }

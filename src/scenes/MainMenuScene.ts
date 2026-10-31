@@ -1,4 +1,7 @@
 import Phaser from 'phaser';
+import { createGameUI } from '../../main menu/index.js';
+import { createSceneOverlay } from '../ui/sceneOverlay';
+import { toGameplaySelection } from '../ui/levelSelection';
 
 export class MainMenuScene extends Phaser.Scene {
   constructor() {
@@ -6,21 +9,13 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.add.text(640, 220, 'Game Title Here', {
-      fontFamily: 'Arial',
-      fontSize: '56px',
-      color: '#ffffff',
-    }).setOrigin(0.5);
-
-    this.add.text(640, 420, 'Start Game', {
-      fontFamily: 'Arial',
-      fontSize: '32px',
-      color: '#ffffff',
-      backgroundColor: '#365fb0',
-    })
-      .setOrigin(0.5)
-      .setPadding(28, 18)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.scene.start('WorldMap'));
+    const host = createSceneOverlay(this);
+    // The real entry now mounts the approved menu/map, not a second placeholder.
+    // Save/settings/launcher behavior can be supplied through these same callbacks.
+    const ui = createGameUI(host.element, {
+      menu: { callbacks: { newGame: () => ui.showMap(), continue: () => ui.showMap() } },
+      onLevelSelect: selection => this.scene.start('Combat', toGameplaySelection(selection)),
+    });
+    this.events.once('shutdown', () => { ui.destroy(); host.destroy(); });
   }
 }

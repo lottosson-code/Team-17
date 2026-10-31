@@ -51,11 +51,26 @@ export interface MenuTheme {
   buttonTextColor: string;
   focusColor: string;
 }
+
+/** One independently positioned foreground sprite over the empty classroom. */
+export interface MenuCharacter {
+  /** Stable ID exposed through data-character-id for host-driven animation. */
+  id: string;
+  imageUrl: string;
+  /** Horizontal center, foot/bottom position and width, as scene percentages. */
+  x: number;
+  y: number;
+  width: number;
+  /** Set false when the game model supplies its own animation. Defaults true. */
+  idle?: boolean;
+}
 export interface MainMenuOptions {
   // See ../README.md for button destinations and host responsibilities.
   title?: string;
   backgroundUrl?: string;
   mapIconUrl?: string;
+  /** Override foreground sprites; [] shows only the empty classroom plate. */
+  characters?: readonly MenuCharacter[];
   labels?: Partial<MenuLabels>;
   layout?: Partial<MenuLayout>;
   theme?: Partial<MenuTheme>;

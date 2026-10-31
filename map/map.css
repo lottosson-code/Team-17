@@ -28,7 +28,7 @@
 .cse-map__bridges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .cse-map__bridge { pointer-events: none; }
 .cse-map__island { z-index: 1; top: var(--y); left: var(--x); width: var(--island-width); transform: translateX(-50%); text-align: center; }
-.cse-map__sprite { display: block; width: 100%; aspect-ratio: 3 / 5; background-image: url('./assets/islands.png'); background-size: 500% auto; background-position-y: 50%; background-repeat: no-repeat; clip-path: inset(0 3%); filter: drop-shadow(0 .8cqw .65cqw #020a10aa); transition: filter .15s; pointer-events: none; }
+.cse-map__sprite { display: block; width: 100%; aspect-ratio: 3 / 5; background-image: url('../assets/map/islands.png'); background-size: 500% auto; background-position-y: 50%; background-repeat: no-repeat; clip-path: inset(0 3%); filter: drop-shadow(0 .8cqw .65cqw #020a10aa); transition: filter .15s; pointer-events: none; }
 .cse-map__island-area { position: absolute; top: 0; left: 0; width: 100%; aspect-ratio: 3 / 5; }
 .cse-map__island .cse-map__label { position: relative; margin-top: -.45cqw; font-size: 1.5cqw; }
 .cse-map__island:hover .cse-map__sprite { filter: drop-shadow(0 .7cqw .8cqw #020a10aa) brightness(1.12); }

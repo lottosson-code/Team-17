@@ -1,10 +1,7 @@
 import type { MapController, MapOptions, MapState } from './types.js';
 import { classrooms, islands, islandSprites, MAP_CONNECTIONS } from './layout.js';
 import { MAP_TEXT } from './labels.js';
-
-function assetUrl(name: string): string {
-  return new URL('./assets/' + name, import.meta.url).href;
-}
+import { ASSETS } from '../assets/index.js';
 
 function createButton(className: string): HTMLButtonElement {
   const button = document.createElement('button');
@@ -65,7 +62,7 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
     title.textContent = MAP_TEXT.classroomTitle;
     state = { ...state, roomId: null };
     root.dataset.room = '';
-    background.src = assetUrl('classrooms.png');
+    background.src = ASSETS.classrooms;
 
     classrooms.forEach((room, index) => {
       const button = createButton('cse-map__room');
@@ -118,7 +115,7 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
       image.classList.add('cse-map__bridge');
       image.setAttribute('data-from', String(connection.fromLevel));
       image.setAttribute('data-to', String(connection.toLevel));
-      image.setAttribute('href', assetUrl('bridge.png'));
+      image.setAttribute('href', ASSETS.bridge);
       image.setAttribute('x', '-12');
       image.setAttribute('y', '-62');
       image.setAttribute('width', String(distance - startInset - endInset + 24));
@@ -137,7 +134,7 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
     title.textContent = MAP_TEXT.submapTitles[roomIndex] || MAP_TEXT.classroomTitle;
     state = { ...state, roomId: room.id };
     root.dataset.room = room.tint;
-    background.src = assetUrl('dream.png');
+    background.src = ASSETS.dream;
     appendBridges();
 
     islands.forEach((island, index) => {

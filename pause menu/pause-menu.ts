@@ -191,7 +191,10 @@ export function createPauseMenu(host: HTMLElement, options: PauseMenuOptions = {
     if (destroyed || root.hidden || event.defaultPrevented) return;
     const actions = available();
     if (event.key === 'Escape') {
-      event.preventDefault(); event.stopPropagation(); void activate('resume'); return;
+      // One physical press changes visibility once; held Escape must not toggle it.
+      event.preventDefault(); event.stopPropagation();
+      if (!event.repeat) void activate('resume');
+      return;
     }
     if (!['Tab', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault(); event.stopPropagation();
