@@ -1,0 +1,6 @@
+@import './main-menu.css';
+@import '../map/map.css';
+
+.cse-game-ui { width: 100%; }
+.cse-game-ui__scene[hidden] { display: none !important; }
+

@@ -1,0 +1,48 @@
+.cse-map {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  container-type: inline-size;
+  background: #101b22;
+  color: #fff0be;
+  font-family: Georgia, 'Palatino Linotype', serif;
+}
+.cse-map, .cse-map * { box-sizing: border-box; }
+.cse-map [hidden] { display: none !important; }
+.cse-map button { font: inherit; color: inherit; padding: 0; border: 0; background: transparent; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.cse-map__background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; user-select: none; }
+.cse-map__shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(#07121bb0, transparent 30%, transparent 72%, #080f17b0); }
+.cse-map__title { position: absolute; z-index: 2; top: 7%; left: 20%; right: 20%; margin: 0; text-align: center; font-size: 4cqw; line-height: 1.12; text-shadow: 0 .2cqw .12cqw #171b1b, 0 .3cqw 1.3cqw #0008; pointer-events: none; }
+.cse-map__content { position: absolute; inset: 0; }
+
+/* Only the painted area and label accept pointer input, not the button box. */
+.cse-map__room, .cse-map__island { position: absolute; pointer-events: none; cursor: default; }
+.cse-map__room-area, .cse-map__island-area, .cse-map__label { pointer-events: auto; cursor: pointer; }
+.cse-map__room { left: calc(1.4% + var(--room-index) * 33.25%); top: 30%; width: 30.6%; height: 44%; }
+.cse-map__room-area { position: absolute; inset: 0; }
+.cse-map__room:hover .cse-map__room-area { background: radial-gradient(ellipse at 50% 68%, #edc77712, transparent 75%); }
+.cse-map__label { display: inline-block; white-space: nowrap; font-size: 1.9cqw; line-height: 1.3; text-shadow: 0 .15cqw .35cqw #020810; transition: color .15s, text-shadow .15s; }
+.cse-map__room .cse-map__label { position: absolute; top: calc(100% + 3.2cqw); left: 50%; transform: translateX(-50%); }
+.cse-map__bridges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.cse-map__bridge { pointer-events: none; }
+.cse-map__island { z-index: 1; top: var(--y); left: var(--x); width: var(--island-width); transform: translateX(-50%); text-align: center; }
+.cse-map__sprite { display: block; width: 100%; aspect-ratio: 3 / 5; background-image: url('./assets/islands.png'); background-size: 500% auto; background-position-y: 50%; background-repeat: no-repeat; clip-path: inset(0 3%); filter: drop-shadow(0 .8cqw .65cqw #020a10aa); transition: filter .15s; pointer-events: none; }
+.cse-map__island-area { position: absolute; top: 0; left: 0; width: 100%; aspect-ratio: 3 / 5; }
+.cse-map__island .cse-map__label { position: relative; margin-top: -.45cqw; font-size: 1.5cqw; }
+.cse-map__island:hover .cse-map__sprite { filter: drop-shadow(0 .7cqw .8cqw #020a10aa) brightness(1.12); }
+.cse-map__room:hover .cse-map__label, .cse-map__island:hover .cse-map__label { color: #fff9e5; text-shadow: 0 0 .6cqw #d8b56a88, 0 .15cqw .35cqw #020810; }
+
+/* A soft mask fades all four edges without adding a visible border. */
+.cse-map .cse-map__back { position: absolute; z-index: 3; top: 5.5%; left: 3%; padding: 1cqw 1.8cqw; border-radius: 1cqw; background: #755638d9; color: #fff4d8; font-size: 1.65cqw; cursor: pointer; mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent), linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent); mask-composite: intersect; }
+.cse-map__back::before { content: '←'; margin-right: .65cqw; }
+.cse-map .cse-map__back:hover { background: #947144eb; }
+.cse-map button:focus-visible { outline: none; }
+.cse-map__room:focus-visible .cse-map__label, .cse-map__island:focus-visible .cse-map__label { text-decoration: underline; text-underline-offset: .35cqw; text-shadow: 0 0 .6cqw #f6d992; }
+.cse-map .cse-map__back:focus-visible { background: #ac854ee8; text-decoration: underline; }
+.cse-map[data-room='olive'] .cse-map__background { filter: hue-rotate(12deg); }
+.cse-map[data-room='blue'] .cse-map__background { filter: hue-rotate(-9deg) saturate(.85); }
+.cse-map__sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .cse-map * { transition: none !important; } }
+

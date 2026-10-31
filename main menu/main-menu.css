@@ -1,0 +1,184 @@
+/* Standalone styles: every selector belongs to this component, not the host game. */
+.cse-main-menu {
+  /* Placement percentages are relative to the full 16:9 game scene. */
+  --menu-title-top: 21.5%;
+  --menu-panel-top: 42%;
+  --menu-panel-left: 34%;
+  --menu-panel-width: 32%;
+  --menu-map-top: 31.5%;
+  --menu-map-left: 61.6%;
+  --menu-map-width: 8.1%;
+
+  --menu-title-color: #fff0be;
+  --menu-title-outline: #303b34;
+  --menu-title-font: Georgia, 'Palatino Linotype', 'Book Antiqua', serif;
+  --menu-body-font: 'Trebuchet MS', Candara, sans-serif;
+  --menu-panel-color: #d0c29ff0;
+  --menu-frame-color: #b99c67;
+  --menu-button-color: #755638;
+  --menu-button-hover-color: #826440;
+  --menu-button-text-color: #ffffff;
+  --menu-focus-color: #fff3b8;
+
+  position: relative;
+  isolation: isolate;
+  container-type: inline-size;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #28272b;
+  color: var(--menu-button-text-color);
+  font-family: var(--menu-body-font);
+}
+.cse-main-menu,
+.cse-main-menu * { box-sizing: border-box; }
+.cse-main-menu[hidden] { display: none !important; }
+.cse-main-menu__background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+.cse-main-menu__title {
+  position: absolute;
+  top: var(--menu-title-top);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 68%;
+  margin: 0;
+  color: var(--menu-title-color);
+  font-family: var(--menu-title-font);
+  font-size: 5.1cqw;
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: .04cqw;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  -webkit-text-stroke: .14cqw var(--menu-title-outline);
+  paint-order: stroke fill;
+  text-shadow: 0 .22cqw .06cqw #3a2c20, 0 .32cqw .6cqw #151d2466;
+}
+.cse-main-menu__panel {
+  position: absolute;
+  top: var(--menu-panel-top);
+  left: var(--menu-panel-left);
+  width: var(--menu-panel-width);
+  height: 32%;
+  /* Equal outer padding; narrow separators between the four actions. */
+  padding: .75cqw;
+  display: flex;
+  flex-direction: column;
+  gap: .32cqw;
+  background: var(--menu-panel-color);
+  border: .1cqw solid var(--menu-frame-color);
+  box-shadow: 0 .3cqw 1cqw #221d1866;
+}
+.cse-main-menu__button,
+.cse-main-menu__map {
+  appearance: none;
+  font-family: var(--menu-body-font);
+  color: var(--menu-button-text-color);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+.cse-main-menu__button {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  padding: .25cqw .65cqw;
+  border: 0;
+  border-radius: .12cqw;
+  background: var(--menu-button-color);
+  box-shadow: none;
+  font-size: 1.82cqw;
+  font-weight: 500;
+  line-height: 1.15;
+}
+.cse-main-menu__map {
+  position: absolute;
+  top: var(--menu-map-top);
+  left: var(--menu-map-left);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: var(--menu-map-width);
+  gap: .2cqw;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 1.25cqw;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.cse-main-menu__map-icon {
+  width: 100%;
+  height: 5.4cqw;
+  object-fit: contain;
+  pointer-events: none;
+}
+.cse-main-menu__map-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 70%;
+  min-height: 1.95cqw;
+  padding: .22cqw .5cqw;
+  border: 0;
+  border-radius: 50%;
+  background: var(--menu-button-color);
+  color: var(--menu-button-text-color);
+  transition: background-color 140ms ease;
+}
+@media (hover: hover) {
+  .cse-main-menu__button:hover:not(:disabled) {
+    background: var(--menu-button-hover-color);
+    transform: translateY(-.08cqw);
+  }
+  .cse-main-menu__map:hover:not(:disabled) {
+    transform: translateY(-.12cqw);
+  }
+  .cse-main-menu__map:hover:not(:disabled) .cse-main-menu__map-label {
+    background: var(--menu-button-hover-color);
+  }
+}
+.cse-main-menu__button:active:not(:disabled),
+.cse-main-menu__map:active:not(:disabled) { transform: translateY(.14cqw); }
+.cse-main-menu__button:focus-visible,
+.cse-main-menu__map:focus-visible {
+  outline: .22cqw solid var(--menu-focus-color);
+  outline-offset: .26cqw;
+  box-shadow: 0 0 0 .5cqw #51493fe6;
+}
+.cse-main-menu__button:disabled,
+.cse-main-menu__map:disabled { opacity: .56; cursor: not-allowed; }
+.cse-main-menu[aria-busy='true'] button { cursor: progress; }
+.cse-main-menu__status {
+  position: absolute;
+  top: 80%;
+  left: 33%;
+  width: 35%;
+  margin: 0;
+  padding: .65cqw 1cqw;
+  border: .1cqw solid #c4ab74;
+  background: #514b43ed;
+  color: #fff0c9;
+  font-size: 1.1cqw;
+  line-height: 1.3;
+  text-align: center;
+}
+.cse-main-menu__status:empty { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .cse-main-menu__button,
+  .cse-main-menu__map,
+  .cse-main-menu__map-label { transition: none; }
+}

@@ -5,3 +5,14 @@ coverage/
 .DS_Store
 *.log
 .env.local
+
+# Generated standalone UI output.
+/main menu/*.js
+/main menu/*.js.map
+/main menu/*.d.ts
+/map/*.js
+/map/*.js.map
+/map/*.d.ts
+/pause menu/*.js
+/pause menu/*.js.map
+/pause menu/*.d.ts
