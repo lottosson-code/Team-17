@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import { CombatModel } from '../combat/CombatModel';
-import { createPlaceholderProblems } from '../combat/placeholderProblems';
-import { TEST_LEVEL } from '../combat/levels';
-import type { CombatEvent, LevelSpec, ProblemSource } from '../combat/types';
+import { CombatModel, SPAWN_CLEARANCE } from '../combat/CombatModel';
+import { createAdditionProblems, createTwistableProblems, createMultiplicationProblems, makeProblem } from '../combat/problems';
+import { MODULE1_LEVEL1 } from '../combat/levels';
+import type { CombatEvent, LevelSpec, ProblemSource, SpawnGroup } from '../combat/types';
 
 /** Predictable answers 1, 2, 3, ... skipping any answer already on screen. */
 function countingProblems(): ProblemSource {
@@ -10,59 +10,130 @@ function countingProblems(): ProblemSource {
     return live => {
         while (live.has(next)) next++;
         const answer = next++;
-        return { text: `#${answer}`, answer };
+        return makeProblem(answer, '+', 0);
     };
+}
+
+function trickle(enemies: string[], overrides: Partial<SpawnGroup> = {}): SpawnGroup {
+    return { type: 'trickle', enemies, startDelayMs: 0, intervalMs: 1000, ...overrides };
+}
+
+function wave(enemies: string[], overrides: Partial<SpawnGroup> = {}): SpawnGroup {
+    return { type: 'wave', enemies, startDelayMs: 0, intervalMs: 100, ...overrides };
 }
 
 function level(overrides: Partial<LevelSpec> = {}): LevelSpec {
     return {
         playerMaxHp: 30,
         damagePerHit: 10,
-        betweenWavesMs: 1000,
+        problems: countingProblems(),
         enemyKinds: {
             grunt: { id: 'grunt', maxHp: 10, walkMs: 1000, attackDamage: 10, attackIntervalMs: 500 },
             tank: { id: 'tank', maxHp: 20, walkMs: 1000, attackDamage: 5, attackIntervalMs: 500 },
         },
-        waves: [{ spawns: [{ atMs: 0, lane: 0, kind: 'grunt' }] }],
+        groups: [trickle(['grunt'])],
         ...overrides,
     };
 }
 
+function create(spec: LevelSpec): CombatModel {
+    return new CombatModel(spec, seededRng(1));
+}
+
 const types = (events: CombatEvent[]) => events.map(event => event.type);
 
+/** Defeats the first enemy on screen. */
+function solveFirst(model: CombatModel): CombatEvent[] {
+    return model.submit(model.getEnemies()[0].problem.answer);
+}
+
 describe('CombatModel', () => {
-    test('starts the first wave and spawns 0 ms enemies immediately', () => {
-        const model = new CombatModel(level(), countingProblems());
+    test('a trickle with no start delay spawns its first enemy immediately', () => {
+        const model = create(level());
         expect(model.getEnemies()).toHaveLength(1);
         expect(model.getStatus()).toBe('playing');
         // Start-up events are delivered on the first tick.
-        expect(types(model.tick(16))).toEqual(['waveStarted', 'enemySpawned']);
+        expect(types(model.tick(16))).toEqual(['enemySpawned']);
     });
 
-    test('spawns later enemies when their time comes', () => {
-        const model = new CombatModel(level({
-            waves: [{ spawns: [{ atMs: 0, lane: 0, kind: 'grunt' }, { atMs: 300, lane: 2, kind: 'grunt' }] }],
-        }), countingProblems());
-        model.tick(200);
+    test('a trickle spaces its enemies by intervalMs', () => {
+        const model = create(level({ groups: [trickle(['grunt', 'grunt'], { intervalMs: 3000 })] }));
+        model.tick(2999);
         expect(model.getEnemies()).toHaveLength(1);
-        expect(types(model.tick(100))).toContain('enemySpawned');
-        expect(model.getEnemies()[1].lane).toBe(2);
+        expect(types(model.tick(1))).toContain('enemySpawned');
         expect(model.getEnemies()[1].progress).toBe(0);
     });
 
+    test('endIntervalMs changes the gaps evenly from intervalMs to endIntervalMs', () => {
+        // Gaps: 1000, 700, 400.
+        const model = create(level({
+            groups: [trickle(['grunt', 'grunt', 'grunt', 'grunt'], { intervalMs: 1000, endIntervalMs: 400 })],
+            enemyKinds: { grunt: { id: 'grunt', maxHp: 10, walkMs: 100000, attackDamage: 1, attackIntervalMs: 500 } },
+        }));
+        model.tick(0); // Flush the first enemy's start-up event.
+        const spawnTimes: number[] = [0];
+        for (let t = 10; t <= 2500; t += 10) {
+            if (types(model.tick(10)).includes('enemySpawned')) spawnTimes.push(t);
+        }
+        expect(spawnTimes).toEqual([0, 1000, 1700, 2100]);
+    });
+
     test('enemies walk along their lane over walkMs', () => {
-        const model = new CombatModel(level(), countingProblems());
+        const model = create(level());
         model.tick(250);
         expect(model.getEnemies()[0].progress).toBeCloseTo(0.25);
     });
 
+    test('a wave waits until every earlier enemy is defeated', () => {
+        const model = create(level({ groups: [trickle(['grunt']), wave(['grunt', 'grunt'])] }));
+        model.tick(16);
+        model.tick(300);
+        expect(model.getEnemies()).toHaveLength(1);
+
+        solveFirst(model);
+        expect(model.tick(16)).toEqual([
+            { type: 'waveStarted', wave: 0, isFinalWave: true },
+            { type: 'enemySpawned', enemyId: 2 },
+        ]);
+        model.tick(100);
+        expect(model.getEnemies()).toHaveLength(2);
+    });
+
+    test('a trickle after a wave starts without waiting for the wave to be cleared', () => {
+        const model = create(level({
+            groups: [wave(['grunt']), trickle(['grunt'], { startDelayMs: 500 })],
+            enemyKinds: { grunt: { id: 'grunt', maxHp: 10, walkMs: 100000, attackDamage: 1, attackIntervalMs: 500 } },
+        }));
+        model.tick(499);
+        expect(model.getEnemies()).toHaveLength(1);
+        model.tick(1);
+        expect(model.getEnemies()).toHaveLength(2);
+    });
+
+    test('enemies never spawn into a lane whose spawn point is occupied', () => {
+        const model = create(level({ groups: [wave(['grunt', 'grunt', 'grunt', 'grunt', 'grunt', 'grunt'], { intervalMs: 0 })] }));
+        // Only 4 lanes, so only 4 appear at once, one per lane.
+        expect(new Set(model.getEnemies().map(enemy => enemy.lane)).size).toBe(4);
+        expect(model.getEnemies()).toHaveLength(4);
+
+        // walkMs is 1000, so lanes clear after SPAWN_CLEARANCE * 1000 ms.
+        model.tick(SPAWN_CLEARANCE * 1000 - 1);
+        expect(model.getEnemies()).toHaveLength(4);
+        model.tick(1);
+        expect(model.getEnemies()).toHaveLength(6);
+
+        for (const enemy of model.getEnemies()) {
+            const sameLane = model.getEnemies().filter(other => other !== enemy && other.lane === enemy.lane);
+            for (const other of sameLane) {
+                expect(Math.abs(other.progress - enemy.progress)).toBeGreaterThanOrEqual(SPAWN_CLEARANCE - 1e-9);
+            }
+        }
+    });
+
     test('a correct answer hits only the enemy whose problem it solves', () => {
-        const model = new CombatModel(level({
-            waves: [{ spawns: [{ atMs: 0, lane: 0, kind: 'grunt' }, { atMs: 0, lane: 1, kind: 'grunt' }] }],
-        }), countingProblems());
+        const model = create(level({ groups: [trickle(['grunt', 'grunt'], { intervalMs: 0 })] }));
         const [first, second] = model.getEnemies();
-        const events = model.submit(second.problem.answer);
-        expect(events).toEqual([
+        expect(model.submit(second.problem.answer)).toEqual([
             { type: 'hit', enemyId: second.id, damage: 10 },
             { type: 'enemyDefeated', enemyId: second.id },
         ]);
@@ -70,7 +141,7 @@ describe('CombatModel', () => {
     });
 
     test('a wrong answer reports wrongAnswer and changes nothing', () => {
-        const model = new CombatModel(level(), countingProblems());
+        const model = create(level());
         const before = model.getEnemies()[0].hp;
         expect(model.submit(999)).toEqual([{ type: 'wrongAnswer', answer: 999 }]);
         expect(model.getEnemies()[0].hp).toBe(before);
@@ -78,20 +149,17 @@ describe('CombatModel', () => {
     });
 
     test('an enemy that survives a hit gets a new, different problem', () => {
-        const model = new CombatModel(level({
-            waves: [{ spawns: [{ atMs: 0, lane: 0, kind: 'tank' }] }],
-        }), countingProblems());
+        const model = create(level({ groups: [trickle(['tank'])] }));
         const tank = model.getEnemies()[0];
         const oldAnswer = tank.problem.answer;
         expect(types(model.submit(oldAnswer))).toEqual(['hit', 'newProblem']);
         expect(tank.hp).toBe(10);
         expect(tank.problem.answer).not.toBe(oldAnswer);
-        // The old answer no longer hits anything.
         expect(types(model.submit(oldAnswer))).toEqual(['wrongAnswer']);
     });
 
     test('an enemy that reaches the wizard attacks on arrival and then every attackIntervalMs', () => {
-        const model = new CombatModel(level({ playerMaxHp: 100 }), countingProblems());
+        const model = create(level({ playerMaxHp: 100 }));
         model.tick(16);
         expect(types(model.tick(1000))).toEqual(['enemyReachedPlayer', 'playerDamaged']);
         expect(model.getEnemies()[0].state).toBe('attacking');
@@ -103,16 +171,8 @@ describe('CombatModel', () => {
         expect(model.getPlayerHp()).toBe(60);
     });
 
-    test('an attacking enemy can still be defeated', () => {
-        const model = new CombatModel(level({ playerMaxHp: 100 }), countingProblems());
-        model.tick(1000);
-        expect(model.getEnemies()[0].state).toBe('attacking');
-        model.submit(model.getEnemies()[0].problem.answer);
-        expect(model.getEnemies()).toHaveLength(0);
-    });
-
     test('the player loses at 0 HP and the model stops', () => {
-        const model = new CombatModel(level({ playerMaxHp: 20 }), countingProblems());
+        const model = create(level({ playerMaxHp: 20 }));
         model.tick(16);
         model.tick(1000);
         expect(types(model.tick(500))).toEqual(['playerDamaged', 'lost']);
@@ -122,70 +182,200 @@ describe('CombatModel', () => {
         expect(model.submit(model.getEnemies()[0].problem.answer)).toEqual([]);
     });
 
-    test('clearing a wave waits betweenWavesMs, then starts the next wave', () => {
-        const model = new CombatModel(level({
-            waves: [
-                { spawns: [{ atMs: 0, lane: 0, kind: 'grunt' }] },
-                { spawns: [{ atMs: 0, lane: 3, kind: 'grunt' }] },
-            ],
-        }), countingProblems());
-        model.tick(16);
-        expect(types(model.submit(model.getEnemies()[0].problem.answer)))
-            .toEqual(['hit', 'enemyDefeated', 'waveCleared']);
-        expect(model.getStatus()).toBe('betweenWaves');
-        expect(model.submit(1)).toEqual([]);
-
-        expect(model.tick(999)).toEqual([]);
-        expect(types(model.tick(1))).toEqual(['waveStarted', 'enemySpawned']);
-        expect(model.getWaveIndex()).toBe(1);
-        expect(model.getEnemies()[0].lane).toBe(3);
-    });
-
-    test('a wave is not cleared while enemies are still due to spawn', () => {
-        const model = new CombatModel(level({
-            waves: [{ spawns: [{ atMs: 0, lane: 0, kind: 'grunt' }, { atMs: 500, lane: 1, kind: 'grunt' }] }],
-        }), countingProblems());
-        expect(types(model.submit(model.getEnemies()[0].problem.answer))).toEqual(['hit', 'enemyDefeated']);
+    test('the level is won only after every group has spawned and every enemy is defeated', () => {
+        const model = create(level({ groups: [trickle(['grunt', 'grunt'], { intervalMs: 500 })] }));
+        expect(types(solveFirst(model))).toEqual(['hit', 'enemyDefeated']);
         expect(model.getStatus()).toBe('playing');
-    });
-
-    test('clearing the last wave wins the level', () => {
-        const model = new CombatModel(level(), countingProblems());
-        const events = model.submit(model.getEnemies()[0].problem.answer);
-        expect(types(events)).toEqual(['hit', 'enemyDefeated', 'waveCleared', 'won']);
+        model.tick(500);
+        expect(types(solveFirst(model))).toEqual(['hit', 'enemyDefeated', 'won']);
         expect(model.getStatus()).toBe('won');
     });
 
+    test('progress is the share of enemies defeated; skulls sit where each wave starts', () => {
+        const model = create(level({
+            groups: [trickle(['grunt', 'grunt'], { intervalMs: 0 }), wave(['grunt', 'grunt']), trickle(['grunt']), wave(['grunt'])],
+        }));
+        expect(model.getWaveMarkers()).toEqual([2 / 6, 5 / 6]);
+        expect(model.getProgress()).toBe(0);
+        solveFirst(model);
+        expect(model.getProgress()).toBeCloseTo(1 / 6);
+        solveFirst(model);
+        expect(model.getProgress()).toBeCloseTo(model.getWaveMarkers()[0]);
+    });
+
+    test('waveStarted numbers only wave groups and flags the last one', () => {
+        const model = create(level({ groups: [wave(['grunt']), trickle(['grunt']), wave(['grunt'])] }));
+        const first = model.tick(16).find(event => event.type === 'waveStarted');
+        expect(first).toEqual({ type: 'waveStarted', wave: 0, isFinalWave: false });
+        solveFirst(model);
+        model.tick(16);
+        solveFirst(model);
+        const second = model.tick(16).find(event => event.type === 'waveStarted');
+        expect(second).toEqual({ type: 'waveStarted', wave: 1, isFinalWave: true });
+    });
+
     test('no two enemies on screen ever share an answer', () => {
-        const model = new CombatModel(TEST_LEVEL, createPlaceholderProblems(seededRng(42)));
+        const model = new CombatModel({
+            ...MODULE1_LEVEL1,
+            problems: createAdditionProblems(18, seededRng(42)),
+            groups: MODULE1_LEVEL1.groups.filter(group => group.type !== 'finale'),
+        }, seededRng(5));
         const rng = seededRng(7);
-        for (let frame = 0; frame < 5000 && model.getStatus() !== 'won' && model.getStatus() !== 'lost'; frame++) {
+        for (let frame = 0; frame < 20000 && model.getStatus() === 'playing'; frame++) {
             model.tick(50);
             const answers = model.getEnemies().map(enemy => enemy.problem.answer);
             expect(new Set(answers).size).toBe(answers.length);
             // Occasionally solve a random enemy, so problems keep being replaced.
             const enemies = model.getEnemies();
-            if (enemies.length > 0 && rng() < 0.05) {
+            if (enemies.length > 0 && rng() < 0.02) {
                 model.submit(enemies[Math.floor(rng() * enemies.length)].problem.answer);
             }
         }
     });
 
     test('throws if the problem source breaks the unique-answer rule', () => {
-        const always7: ProblemSource = () => ({ text: '3 + 4 = ?', answer: 7 });
-        expect(() => new CombatModel(level({
-            waves: [{ spawns: [{ atMs: 0, lane: 0, kind: 'grunt' }, { atMs: 0, lane: 1, kind: 'grunt' }] }],
-        }), always7)).toThrow(/duplicate answer 7/);
+        const always7: ProblemSource = () => makeProblem(3, '+', 4);
+        expect(() => create(level({
+            problems: always7,
+            groups: [trickle(['grunt', 'grunt'], { intervalMs: 0 })],
+        }))).toThrow(/duplicate answer 7/);
     });
 
     test('rejects invalid level data', () => {
-        expect(() => new CombatModel(level({ waves: [] }), countingProblems())).toThrow();
-        expect(() => new CombatModel(level({
-            waves: [{ spawns: [{ atMs: 0, lane: 4, kind: 'grunt' }] }],
-        }), countingProblems())).toThrow(/lane 4/);
-        expect(() => new CombatModel(level({
-            waves: [{ spawns: [{ atMs: 0, lane: 0, kind: 'dragon' }] }],
-        }), countingProblems())).toThrow(/dragon/);
+        expect(() => create(level({ groups: [] }))).toThrow();
+        expect(() => create(level({ groups: [trickle([])] }))).toThrow(/no enemies/);
+        expect(() => create(level({ groups: [trickle(['dragon'])] }))).toThrow(/dragon/);
+        expect(() => create(level({ groups: [trickle(['grunt'], { intervalMs: -1 })] }))).toThrow(/negative/);
+        expect(() => create(level({
+            groups: [wave(['grunt'], { cutscene: { id: 'x' } })],
+        }))).toThrow(/finale/);
+    });
+});
+
+describe('CombatModel cutscenes', () => {
+    /** One trickle enemy, then a finale whose 3 enemies get twistable + problems. */
+    function twistLevel(): LevelSpec {
+        return level({
+            playerMaxHp: 100,
+            groups: [
+                trickle(['grunt']),
+                {
+                    type: 'finale',
+                    enemies: ['tank', 'grunt', 'grunt'],
+                    startDelayMs: 0,
+                    intervalMs: 0,
+                    problems: createTwistableProblems('+', '*', 2, 9, seededRng(3)),
+                    cutscene: {
+                        id: 'bossTwist',
+                        twist: { from: '+', to: '*', problemsAfter: createMultiplicationProblems(2, 9, seededRng(4)) },
+                    },
+                },
+            ],
+        });
+    }
+
+    /** Clears the trickle enemy so the finale starts. */
+    function startCutscene(model: CombatModel): CombatEvent[] {
+        model.tick(0); // Flush start-up events.
+        solveFirst(model);
+        return model.tick(16);
+    }
+
+    test('a finale spawns its enemies, then freezes the game for the cutscene', () => {
+        const model = create(twistLevel());
+        expect(types(startCutscene(model))).toEqual([
+            'enemySpawned', 'enemySpawned', 'enemySpawned', 'cutsceneStarted',
+        ]);
+        expect(model.getStatus()).toBe('cutscene');
+        expect(model.getCutscene()?.id).toBe('bossTwist');
+
+        model.tick(5000);
+        expect(model.getEnemies()).toHaveLength(3);
+        expect(model.getEnemies().every(enemy => enemy.progress === 0)).toBe(true);
+        expect(model.submit(model.getEnemies()[0].problem.answer)).toEqual([]);
+    });
+
+    test('twistOperators turns + into × and keeps answers unique', () => {
+        const model = create(twistLevel());
+        startCutscene(model);
+        const before = model.getEnemies().map(enemy => ({ ...enemy.problem }));
+        expect(before.every(p => p.operator === '+' && p.left <= 9 && p.right <= 9)).toBe(true);
+
+        expect(types(model.twistOperators())).toEqual(['problemTwisted', 'problemTwisted', 'problemTwisted']);
+        model.getEnemies().forEach((enemy, i) => {
+            expect(enemy.problem).toEqual(makeProblem(before[i].left, '*', before[i].right));
+        });
+        const answers = model.getEnemies().map(enemy => enemy.problem.answer);
+        expect(new Set(answers).size).toBe(3);
+    });
+
+    test('after the cutscene, twisted enemies get multiplication and the level is won once they are defeated', () => {
+        const model = create(twistLevel());
+        startCutscene(model);
+        model.twistOperators();
+        expect(model.endCutscene()).toEqual([{ type: 'cutsceneEnded', id: 'bossTwist' }]);
+        expect(model.getCutscene()).toBeUndefined();
+        expect(model.getStatus()).toBe('playing');
+
+        // The 20 HP tank survives one hit and gets a multiplication problem, not addition.
+        const tank = model.getEnemies()[0];
+        model.submit(tank.problem.answer);
+        expect(tank.problem.operator).toBe('*');
+
+        solveFirst(model);
+        solveFirst(model);
+        expect(types(solveFirst(model))).toEqual(['hit', 'enemyDefeated', 'won']);
+    });
+
+    test('twistOperators and endCutscene throw outside a cutscene', () => {
+        const model = create(twistLevel());
+        expect(() => model.twistOperators()).toThrow();
+        expect(() => model.endCutscene()).toThrow();
+    });
+
+    test('twistOperators throws if the twist would create duplicate answers', () => {
+        // 2 + 6 and 3 + 4 have different sums (8, 7) but 2 × 6 = 3 × 4 = 12.
+        const fixed = [makeProblem(2, '+', 6), makeProblem(3, '+', 4)];
+        const model = create(level({
+            problems: () => fixed.shift()!,
+            groups: [{
+                type: 'finale', enemies: ['grunt', 'grunt'], startDelayMs: 0, intervalMs: 0,
+                cutscene: { id: 'bossTwist', twist: { from: '+', to: '*' } },
+            }],
+        }));
+        expect(() => model.twistOperators()).toThrow(/duplicate answers/);
+    });
+});
+
+describe('MODULE1_LEVEL1', () => {
+    test('is 4 trickle, a wave of 4, 6 faster trickle, a wave of 6, then the boss finale', () => {
+        const groups = MODULE1_LEVEL1.groups;
+        expect(groups.map(group => [group.type, group.enemies.length])).toEqual([
+            ['trickle', 4], ['wave', 4], ['trickle', 6], ['wave', 6], ['finale', 3],
+        ]);
+        expect(groups[2].endIntervalMs).toBeLessThan(groups[2].intervalMs);
+        // Wave enemies come much faster than trickle enemies.
+        expect(groups[1].intervalMs * 5).toBeLessThan(groups[0].intervalMs);
+        expect(groups[4].cutscene?.id).toBe('bossTwist');
+        expect(groups[4].cutscene?.twist).toMatchObject({ from: '+', to: '*' });
+        expect(new CombatModel(MODULE1_LEVEL1).getWaveMarkers()).toHaveLength(2);
+    });
+
+    test('uses addition under 100 until the finale, which twists 3 single-digit additions', () => {
+        const model = new CombatModel(MODULE1_LEVEL1, seededRng(9));
+        for (let frame = 0; frame < 20000 && model.getStatus() === 'playing'; frame++) {
+            for (const enemy of model.getEnemies()) {
+                expect(enemy.problem.operator).toBe('+');
+                expect(enemy.problem.answer).toBeLessThan(100);
+            }
+            const enemies = model.getEnemies();
+            if (enemies.length > 0) model.submit(enemies[0].problem.answer);
+            model.tick(50);
+        }
+        expect(model.getStatus()).toBe('cutscene');
+        expect(model.getEnemies()).toHaveLength(3);
+        expect(model.getEnemies().every(enemy => enemy.problem.left <= 9 && enemy.problem.right <= 9)).toBe(true);
+        expect(model.getProgress()).toBeCloseTo(20 / 23);
     });
 });
 

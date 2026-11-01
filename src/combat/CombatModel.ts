@@ -1,64 +1,74 @@
+import { makeProblem } from './problems';
 import {
     LANE_COUNT,
     type CombatEvent,
+    type CombatProblem,
     type CombatStatus,
+    type CutsceneSpec,
     type Enemy,
     type LevelSpec,
     type ProblemSource,
-    type SpawnSpec,
+    type SpawnGroup,
 } from './types';
+
+/** A lane can take a new enemy once the last one in it has walked this far (0-1). */
+export const SPAWN_CLEARANCE = 0.12;
 
 /**
  * The rules of one combat level, with no Phaser or DOM code.
  * The scene calls `tick` every frame and `submit` when the player casts a spell,
  * then draws `getEnemies()` and plays animations for the returned events.
+ *
+ * Progression: the level's groups play in order (see GroupType). Progress is the share of
+ * the level's enemies defeated, so the bar reaches a wave's skull exactly when that wave starts.
+ *
+ * Cutscenes: after a 'finale' group's enemies appear, status becomes 'cutscene' and time
+ * stops. The scene plays the animation, calls `twistOperators()` if the cutscene has
+ * a twist, then `endCutscene()` to resume play.
  */
 export class CombatModel {
     private readonly level: LevelSpec;
-    private readonly nextProblem: ProblemSource;
+    private readonly rng: () => number;
+    private readonly totalEnemies: number;
 
     private status: CombatStatus = 'playing';
     private playerHp: number;
     private enemies: Enemy[] = [];
     private nextEnemyId = 1;
+    private defeatedCount = 0;
 
-    private waveIndex = 0;
-    private waveElapsedMs = 0;
-    private nextSpawnIndex = 0;
-    private waveSpawns: SpawnSpec[] = [];
-    private betweenWavesLeftMs = 0;
+    private groupIndex = 0;
+    private groupStarted = false;
+    private spawnedInGroup = 0;
+    private spawnTimerMs = 0;
+    private activeCutscene: CutsceneSpec | undefined;
 
     /** Events produced outside tick/submit, delivered on the next tick. */
     private pending: CombatEvent[] = [];
 
-    constructor(level: LevelSpec, nextProblem: ProblemSource) {
+    constructor(level: LevelSpec, rng: () => number = Math.random) {
         validateLevel(level);
         this.level = level;
-        this.nextProblem = nextProblem;
+        this.rng = rng;
         this.playerHp = level.playerMaxHp;
-        this.startWave(0, this.pending);
+        this.totalEnemies = level.groups.reduce((sum, group) => sum + group.enemies.length, 0);
+        // Groups with no start delay spawn immediately rather than one frame later.
+        this.advanceSpawning(0, this.pending);
     }
 
     /** Advances time: spawns, moves and attacks. Returns what happened. */
     public tick(dtMs: number): CombatEvent[] {
         const events = this.pending;
         this.pending = [];
-        if (this.isOver() || dtMs <= 0) return events;
+        if (this.isOver() || this.status === 'cutscene' || dtMs <= 0) return events;
 
-        if (this.status === 'betweenWaves') {
-            this.betweenWavesLeftMs -= dtMs;
-            if (this.betweenWavesLeftMs <= 0) this.startWave(this.waveIndex + 1, events);
-            return events;
-        }
-
-        this.waveElapsedMs += dtMs;
         // Move existing enemies before spawning, so new ones start at progress 0.
         for (const enemy of this.enemies) {
             this.advanceEnemy(enemy, dtMs, events);
             if (this.isOver()) return events;
         }
-        this.spawnDueEnemies(events);
-        this.checkWaveCleared(events);
+        this.advanceSpawning(dtMs, events);
+        this.checkWon(events);
         return events;
     }
 
@@ -79,14 +89,52 @@ export class CombatModel {
 
         if (target.hp === 0) {
             this.enemies = this.enemies.filter(enemy => enemy !== target);
+            this.defeatedCount++;
             events.push({ type: 'enemyDefeated', enemyId: target.id });
-            this.checkWaveCleared(events);
+            this.checkWon(events);
         } else {
             // A surviving enemy gets a fresh problem, so the same answer can't hit it twice.
-            target.problem = this.createProblem();
+            target.problem = this.createProblem(target.problems);
             events.push({ type: 'newProblem', enemyId: target.id });
         }
         return events;
+    }
+
+    /**
+     * During a cutscene with a twist: rewrites every live problem using `twist.from`
+     * into `twist.to` (e.g. 3 + 4 becomes 3 × 4). Those enemies then take their
+     * later problems from `twist.problemsAfter`.
+     */
+    public twistOperators(): CombatEvent[] {
+        const twist = this.activeCutscene?.twist;
+        if (this.status !== 'cutscene' || !twist) throw new Error('No operator twist is running');
+
+        const events: CombatEvent[] = [];
+        const twisted = this.enemies.filter(enemy => enemy.problem.operator === twist.from);
+        for (const enemy of twisted) {
+            enemy.problem = makeProblem(enemy.problem.left, twist.to, enemy.problem.right);
+            enemy.problems = twist.problemsAfter ?? this.level.problems;
+            events.push({ type: 'problemTwisted', enemyId: enemy.id });
+        }
+        const answers = this.enemies.map(enemy => enemy.problem.answer);
+        if (new Set(answers).size !== answers.length) {
+            throw new Error('Twist produced duplicate answers; spawn these enemies with createTwistableProblems');
+        }
+        return events;
+    }
+
+    /** Ends the running cutscene and resumes play. */
+    public endCutscene(): CombatEvent[] {
+        const cutscene = this.activeCutscene;
+        if (this.status !== 'cutscene' || !cutscene) throw new Error('No cutscene is running');
+        this.status = 'playing';
+        this.activeCutscene = undefined;
+        return [{ type: 'cutsceneEnded', id: cutscene.id }];
+    }
+
+    /** The cutscene that is playing, if any. */
+    public getCutscene(): CutsceneSpec | undefined {
+        return this.activeCutscene;
     }
 
     public getStatus(): CombatStatus {
@@ -110,50 +158,100 @@ export class CombatModel {
         return this.enemies.find(enemy => enemy.id === id);
     }
 
-    /** 0-based index of the current (or just-cleared) wave. */
-    public getWaveIndex(): number {
-        return this.waveIndex;
+    /** Level progress from 0 to 1: the share of all the level's enemies defeated. */
+    public getProgress(): number {
+        return this.defeatedCount / this.totalEnemies;
     }
 
-    public getWaveCount(): number {
-        return this.level.waves.length;
+    /** Where each wave's skull sits on the progress bar (0-1), in order. */
+    public getWaveMarkers(): number[] {
+        const markers: number[] = [];
+        let before = 0;
+        for (const group of this.level.groups) {
+            if (group.type === 'wave') markers.push(before / this.totalEnemies);
+            before += group.enemies.length;
+        }
+        return markers;
     }
 
     private isOver(): boolean {
         return this.status === 'won' || this.status === 'lost';
     }
 
-    private startWave(index: number, events: CombatEvent[]): void {
-        this.status = 'playing';
-        this.waveIndex = index;
-        this.waveElapsedMs = 0;
-        this.nextSpawnIndex = 0;
-        this.waveSpawns = [...this.level.waves[index].spawns].sort((a, b) => a.atMs - b.atMs);
-        events.push({ type: 'waveStarted', wave: index });
-        // Spawns at 0 ms appear immediately rather than one frame later.
-        this.spawnDueEnemies(events);
+    /** Starts groups and spawns their enemies as time passes. */
+    private advanceSpawning(dtMs: number, events: CombatEvent[]): void {
+        while (this.groupIndex < this.level.groups.length) {
+            const group = this.level.groups[this.groupIndex];
+
+            if (!this.groupStarted) {
+                // Waves and finales wait until every earlier enemy is defeated.
+                if (group.type !== 'trickle' && this.enemies.length > 0) return;
+                this.startGroup(group, events);
+            } else {
+                this.spawnTimerMs -= dtMs;
+            }
+            // Time is only counted once, by the group running at the start of this tick.
+            dtMs = 0;
+
+            while (this.spawnTimerMs <= 0 && this.spawnedInGroup < group.enemies.length) {
+                const lane = this.pickFreeLane();
+                // Every lane's spawn point is occupied; try again next tick.
+                if (lane === undefined) return;
+                this.spawn(group, group.enemies[this.spawnedInGroup], lane, events);
+                this.spawnedInGroup++;
+                this.spawnTimerMs += gapAfter(group, this.spawnedInGroup);
+            }
+            if (this.spawnedInGroup < group.enemies.length) return;
+
+            // Group fully spawned; move on.
+            this.groupIndex++;
+            this.groupStarted = false;
+            if (group.cutscene) {
+                this.activeCutscene = group.cutscene;
+                this.status = 'cutscene';
+                events.push({ type: 'cutsceneStarted', id: group.cutscene.id });
+                return;
+            }
+        }
     }
 
-    private spawnDueEnemies(events: CombatEvent[]): void {
-        while (
-            this.nextSpawnIndex < this.waveSpawns.length &&
-            this.waveSpawns[this.nextSpawnIndex].atMs <= this.waveElapsedMs
-        ) {
-            const spawn = this.waveSpawns[this.nextSpawnIndex++];
-            const kind = this.level.enemyKinds[spawn.kind];
-            const enemy: Enemy = {
-                id: this.nextEnemyId++,
-                kind,
-                lane: spawn.lane,
-                progress: 0,
-                hp: kind.maxHp,
-                problem: this.createProblem(),
-                state: 'walking',
-                attackCooldownMs: 0,
-            };
-            this.enemies.push(enemy);
-            events.push({ type: 'enemySpawned', enemyId: enemy.id });
+    private startGroup(group: SpawnGroup, events: CombatEvent[]): void {
+        this.groupStarted = true;
+        this.spawnedInGroup = 0;
+        this.spawnTimerMs = group.startDelayMs;
+        if (group.type === 'wave') {
+            const waves = this.level.groups.filter(other => other.type === 'wave');
+            const wave = waves.indexOf(group);
+            events.push({ type: 'waveStarted', wave, isFinalWave: wave === waves.length - 1 });
         }
+    }
+
+    /** A random lane whose spawn point is clear, or undefined if none is. */
+    private pickFreeLane(): number | undefined {
+        const free: number[] = [];
+        for (let lane = 0; lane < LANE_COUNT; lane++) {
+            const blocked = this.enemies.some(enemy => enemy.lane === lane && enemy.progress < SPAWN_CLEARANCE);
+            if (!blocked) free.push(lane);
+        }
+        return free.length === 0 ? undefined : free[Math.floor(this.rng() * free.length)];
+    }
+
+    private spawn(group: SpawnGroup, kindId: string, lane: number, events: CombatEvent[]): void {
+        const kind = this.level.enemyKinds[kindId];
+        const problems = group.problems ?? this.level.problems;
+        const enemy: Enemy = {
+            id: this.nextEnemyId++,
+            kind,
+            lane,
+            progress: 0,
+            hp: kind.maxHp,
+            problem: this.createProblem(problems),
+            problems,
+            state: 'walking',
+            attackCooldownMs: 0,
+        };
+        this.enemies.push(enemy);
+        events.push({ type: 'enemySpawned', enemyId: enemy.id });
     }
 
     private advanceEnemy(enemy: Enemy, dtMs: number, events: CombatEvent[]): void {
@@ -186,24 +284,19 @@ export class CombatModel {
         }
     }
 
-    private checkWaveCleared(events: CombatEvent[]): void {
-        const allSpawned = this.nextSpawnIndex >= this.waveSpawns.length;
+    /** Won once every group has spawned and every enemy is defeated. */
+    private checkWon(events: CombatEvent[]): void {
+        const allSpawned = this.groupIndex >= this.level.groups.length;
         if (this.status !== 'playing' || !allSpawned || this.enemies.length > 0) return;
-
-        events.push({ type: 'waveCleared', wave: this.waveIndex });
-        if (this.waveIndex === this.level.waves.length - 1) {
-            this.status = 'won';
-            events.push({ type: 'won' });
-        } else {
-            this.status = 'betweenWaves';
-            this.betweenWavesLeftMs = this.level.betweenWavesMs;
-        }
+        this.status = 'won';
+        events.push({ type: 'won' });
     }
 
     /** Enforces the rule that no two enemies on screen share an answer. */
-    private createProblem(): Enemy['problem'] {
-        const live = new Set(this.enemies.map(enemy => enemy.problem.answer));
-        const problem = this.nextProblem(live);
+    private createProblem(source: ProblemSource): CombatProblem {
+        const liveProblems = this.enemies.map(enemy => enemy.problem);
+        const live = new Set(liveProblems.map(problem => problem.answer));
+        const problem = source(live, liveProblems);
         if (live.has(problem.answer)) {
             throw new Error(`Problem source returned duplicate answer ${problem.answer}`);
         }
@@ -211,8 +304,16 @@ export class CombatModel {
     }
 }
 
+/** Gap before the next enemy, after `spawned` enemies of the group have appeared. */
+function gapAfter(group: SpawnGroup, spawned: number): number {
+    if (group.endIntervalMs === undefined) return group.intervalMs;
+    const gaps = group.enemies.length - 1;
+    const t = gaps > 1 ? (spawned - 1) / (gaps - 1) : 0;
+    return group.intervalMs + (group.endIntervalMs - group.intervalMs) * t;
+}
+
 function validateLevel(level: LevelSpec): void {
-    if (level.waves.length === 0) throw new Error('Level needs at least one wave');
+    if (level.groups.length === 0) throw new Error('Level needs at least one group');
     if (level.playerMaxHp <= 0) throw new Error('playerMaxHp must be positive');
     if (level.damagePerHit <= 0) throw new Error('damagePerHit must be positive');
     for (const [id, kind] of Object.entries(level.enemyKinds)) {
@@ -220,13 +321,14 @@ function validateLevel(level: LevelSpec): void {
             throw new Error(`Enemy kind "${id}" needs positive maxHp, walkMs and attackIntervalMs`);
         }
     }
-    level.waves.forEach((wave, w) => {
-        if (wave.spawns.length === 0) throw new Error(`Wave ${w} has no spawns`);
-        for (const spawn of wave.spawns) {
-            if (!level.enemyKinds[spawn.kind]) throw new Error(`Wave ${w}: unknown enemy kind "${spawn.kind}"`);
-            if (!Number.isInteger(spawn.lane) || spawn.lane < 0 || spawn.lane >= LANE_COUNT) {
-                throw new Error(`Wave ${w}: lane ${spawn.lane} is outside 0-${LANE_COUNT - 1}`);
-            }
+    level.groups.forEach((group, g) => {
+        if (group.enemies.length === 0) throw new Error(`Group ${g} has no enemies`);
+        if (group.startDelayMs < 0 || group.intervalMs < 0 || (group.endIntervalMs ?? 0) < 0) {
+            throw new Error(`Group ${g}: delays and intervals cannot be negative`);
+        }
+        if (group.cutscene && group.type !== 'finale') throw new Error(`Group ${g}: only a 'finale' can have a cutscene`);
+        for (const kind of group.enemies) {
+            if (!level.enemyKinds[kind]) throw new Error(`Group ${g}: unknown enemy kind "${kind}"`);
         }
     });
 }
