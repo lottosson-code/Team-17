@@ -1,6 +1,6 @@
 import MathProblem from "./MathProblem";
 
-type ProblemType = "addition" | "subtraction" | "multiplication" | "division";
+export type ProblemType = "addition" | "subtraction" | "multiplication" | "division";
 
 export default class ProblemGenerator implements MathProblem {
     

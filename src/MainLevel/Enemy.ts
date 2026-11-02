@@ -1,9 +1,10 @@
+import {ProblemType} from "../Math/ProblemGenerator"
 import PG from "../Math/ProblemGenerator"
 import Player from "./PlayerCombatant"
 import MathProblem from "../Math/MathProblem"
 
 export default class Enemy {
-    private _type: string;
+    private _type: ProblemType;
     private _health: number;
     private _speed: number;
     private _lane: number;
@@ -15,7 +16,7 @@ export default class Enemy {
 
     //Constructor has a lot of generalizations that will be more specific when 
     //we implement more features, ie: speed may be higher or lower than 1
-    constructor(lane: number, type: string) {
+    constructor(lane: number, type: ProblemType) {
         //For now health, speed, and type are initialized as one since we only
         //have one monster type
         this._type = type;
@@ -26,15 +27,7 @@ export default class Enemy {
         this._positionX = 0;
         this._positionY = 0;
         //Calls ProblemGenerator based on the type
-        if (type == "add") {
-            this._problem = PG.add();
-        } else if (type == "sub") { 
-            this._problem = PG.sub();
-        } else {
-            //Maybe make this will throw an error in the future when we have 
-            //all of our specifics sorted out.
-            this._problem = PG.add_or_sub();
-        }
+        this._problem = new PG(type);
     }
 
     public advance() {  
@@ -61,9 +54,10 @@ export default class Enemy {
     //since there are no variants yet, maybe in the future.
     //Depending on implementation, this could call this.takeHit() so that Enemy
     //only hits once
-    public attack(player: Player) {
-        player.takeDamage(1);
-    }
+    //TODO
+    // public attack(player: Player) {
+    //     player.takeDamage(1);
+    // }
 
     //Setters for positionX and positionY
     public set positionX(posX: number) {
