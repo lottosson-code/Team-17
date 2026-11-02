@@ -1,6 +1,5 @@
 import {ProblemType} from "../Math/ProblemGenerator"
 import PG from "../Math/ProblemGenerator"
-import Player from "./PlayerCombatant"
 import MathProblem from "../Math/MathProblem"
 
 export default class Enemy {
