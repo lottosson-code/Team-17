@@ -22,8 +22,8 @@ export const SPAWN_CLEARANCE = 0.12;
  * Progression: the level's groups play in order (see GroupType). Progress is the share of
  * the level's enemies defeated, so the bar reaches a wave's skull exactly when that wave starts.
  *
- * Cutscenes: after a 'finale' group's enemies appear, status becomes 'cutscene' and time
- * stops. The scene plays the animation, calls `twistOperators()` if the cutscene has
+ * Cutscenes: when a 'finale' group starts (when: 'beforeSpawn') or once its enemies have
+ * appeared (default), status becomes 'cutscene' and time stops. The scene plays the animation, calls `twistOperators()` if the cutscene has
  * a twist, then `endCutscene()` to resume play.
  */
 export class CombatModel {
@@ -39,7 +39,8 @@ export class CombatModel {
 
     private groupIndex = 0;
     private groupStarted = false;
-    private spawnedInGroup = 0;
+    private spawnedInGroup = 0; // Entries of group.enemies fully spawned
+    private memberIndex = 0; // Members of the current entry spawned, when it is a list
     private spawnTimerMs = 0;
     private activeCutscene: CutsceneSpec | undefined;
 
@@ -51,7 +52,7 @@ export class CombatModel {
         this.level = level;
         this.rng = rng;
         this.playerHp = level.playerMaxHp;
-        this.totalEnemies = level.groups.reduce((sum, group) => sum + group.enemies.length, 0);
+        this.totalEnemies = level.groups.reduce((sum, group) => sum + countEnemies(group), 0);
         // Groups with no start delay spawn immediately rather than one frame later.
         this.advanceSpawning(0, this.pending);
     }
@@ -169,7 +170,7 @@ export class CombatModel {
         let before = 0;
         for (const group of this.level.groups) {
             if (group.type === 'wave') markers.push(before / this.totalEnemies);
-            before += group.enemies.length;
+            before += countEnemies(group);
         }
         return markers;
     }
@@ -187,6 +188,7 @@ export class CombatModel {
                 // Waves and finales wait until every earlier enemy is defeated.
                 if (group.type !== 'trickle' && this.enemies.length > 0) return;
                 this.startGroup(group, events);
+                if (this.status === 'cutscene') return;
             } else {
                 this.spawnTimerMs -= dtMs;
             }
@@ -194,10 +196,15 @@ export class CombatModel {
             dtMs = 0;
 
             while (this.spawnTimerMs <= 0 && this.spawnedInGroup < group.enemies.length) {
-                const lane = this.pickFreeLane();
-                // Every lane's spawn point is occupied; try again next tick.
-                if (lane === undefined) return;
-                this.spawn(group, group.enemies[this.spawnedInGroup], lane, events);
+                const entry = asList(group.enemies[this.spawnedInGroup]);
+                while (this.memberIndex < entry.length) {
+                    const lane = this.pickFreeLane();
+                    // Every lane's spawn point is occupied; try again next tick.
+                    if (lane === undefined) return;
+                    this.spawn(group, entry[this.memberIndex], lane, events);
+                    this.memberIndex++;
+                }
+                this.memberIndex = 0;
                 this.spawnedInGroup++;
                 this.spawnTimerMs += gapAfter(group, this.spawnedInGroup);
             }
@@ -206,10 +213,8 @@ export class CombatModel {
             // Group fully spawned; move on.
             this.groupIndex++;
             this.groupStarted = false;
-            if (group.cutscene) {
-                this.activeCutscene = group.cutscene;
-                this.status = 'cutscene';
-                events.push({ type: 'cutsceneStarted', id: group.cutscene.id });
+            if (group.cutscene && group.cutscene.when !== 'beforeSpawn') {
+                this.startCutscene(group.cutscene, events);
                 return;
             }
         }
@@ -218,12 +223,21 @@ export class CombatModel {
     private startGroup(group: SpawnGroup, events: CombatEvent[]): void {
         this.groupStarted = true;
         this.spawnedInGroup = 0;
+        this.memberIndex = 0;
         this.spawnTimerMs = group.startDelayMs;
+        if (group.announce) events.push({ type: 'announcement', text: group.announce });
+        if (group.cutscene?.when === 'beforeSpawn') this.startCutscene(group.cutscene, events);
         if (group.type === 'wave') {
             const waves = this.level.groups.filter(other => other.type === 'wave');
             const wave = waves.indexOf(group);
             events.push({ type: 'waveStarted', wave, isFinalWave: wave === waves.length - 1 });
         }
+    }
+
+    private startCutscene(cutscene: CutsceneSpec, events: CombatEvent[]): void {
+        this.activeCutscene = cutscene;
+        this.status = 'cutscene';
+        events.push({ type: 'cutsceneStarted', id: cutscene.id });
     }
 
     /** A random lane whose spawn point is clear, or undefined if none is. */
@@ -238,7 +252,7 @@ export class CombatModel {
 
     private spawn(group: SpawnGroup, kindId: string, lane: number, events: CombatEvent[]): void {
         const kind = this.level.enemyKinds[kindId];
-        const problems = group.problems ?? this.level.problems;
+        const problems = kind.ownProblems?.() ?? group.problems ?? this.level.problems;
         const enemy: Enemy = {
             id: this.nextEnemyId++,
             kind,
@@ -304,7 +318,15 @@ export class CombatModel {
     }
 }
 
-/** Gap before the next enemy, after `spawned` enemies of the group have appeared. */
+function asList(entry: string | string[]): string[] {
+    return typeof entry === 'string' ? [entry] : entry;
+}
+
+function countEnemies(group: SpawnGroup): number {
+    return group.enemies.reduce((sum, entry) => sum + asList(entry).length, 0);
+}
+
+/** Gap before the next entry, after `spawned` entries of the group have appeared. */
 function gapAfter(group: SpawnGroup, spawned: number): number {
     if (group.endIntervalMs === undefined) return group.intervalMs;
     const gaps = group.enemies.length - 1;
@@ -327,8 +349,14 @@ function validateLevel(level: LevelSpec): void {
             throw new Error(`Group ${g}: delays and intervals cannot be negative`);
         }
         if (group.cutscene && group.type !== 'finale') throw new Error(`Group ${g}: only a 'finale' can have a cutscene`);
-        for (const kind of group.enemies) {
-            if (!level.enemyKinds[kind]) throw new Error(`Group ${g}: unknown enemy kind "${kind}"`);
+        for (const entry of group.enemies) {
+            const kinds = asList(entry);
+            if (kinds.length === 0 || kinds.length > LANE_COUNT) {
+                throw new Error(`Group ${g}: enemies appearing together must number 1-${LANE_COUNT}`);
+            }
+            for (const kind of kinds) {
+                if (!level.enemyKinds[kind]) throw new Error(`Group ${g}: unknown enemy kind "${kind}"`);
+            }
         }
     });
 }

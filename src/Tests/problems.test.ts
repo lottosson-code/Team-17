@@ -1,12 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import {
     createAdditionProblems,
+    createMixedProblems,
     createMultiplicationProblems,
+    createTimesTableProblems,
     createTwistableProblems,
+    createZeroProblems,
     makeProblem,
     problemText,
 } from '../combat/problems';
-import type { CombatProblem } from '../combat/types';
+import type { CombatProblem, ProblemSource } from '../combat/types';
 
 describe('problem sources', () => {
     test('problemText uses display symbols', () => {
@@ -58,6 +61,47 @@ describe('problem sources', () => {
             expect(new Set(sums).size).toBe(4);
             expect(new Set(products).size).toBe(4);
         }
+    });
+
+    test('zero problems multiply by 0, and only one can be on screen', () => {
+        const next = createZeroProblems(11);
+        for (let i = 0; i < 100; i++) {
+            const p = next(new Set(), []);
+            expect(p.operator).toBe('*');
+            expect(p.answer).toBe(0);
+            expect(p.left === 0 || p.right === 0).toBe(true);
+            expect(Math.max(p.left, p.right)).toBeLessThanOrEqual(11);
+        }
+        expect(() => next(new Set([0]), [])).toThrow();
+    });
+
+    test('mixed problems follow the weights and fall back when a source has no unique problem', () => {
+        const always = (answer: number): ProblemSource => live => {
+            if (live.has(answer)) throw new Error('taken');
+            return makeProblem(answer, '+', 0);
+        };
+        const next = createMixedProblems([
+            { source: always(1), weight: 3 },
+            { source: always(2), weight: 1 },
+        ]);
+        const counts = { 1: 0, 2: 0 };
+        for (let i = 0; i < 4000; i++) counts[next(new Set(), []).answer as 1 | 2]++;
+        expect(counts[1] / 4000).toBeCloseTo(0.75, 1);
+
+        expect(next(new Set([1]), []).answer).toBe(2);
+        expect(() => next(new Set([1, 2]), [])).toThrow();
+    });
+
+    test('a times table goes 1 × a up to count × a, and each enemy gets its own', () => {
+        const factory = createTimesTableProblems([7, 8, 9], 12);
+        const first = factory();
+        const problems = Array.from({ length: 12 }, () => first(new Set(), []));
+        const table = problems[0].right;
+        expect([7, 8, 9]).toContain(table);
+        expect(problems).toEqual(Array.from({ length: 12 }, (_, i) => makeProblem(i + 1, '*', table)));
+
+        // A second enemy starts again from 1.
+        expect(factory()(new Set(), []).left).toBe(1);
     });
 
     test('twistable problems avoid answers already on screen after the twist', () => {

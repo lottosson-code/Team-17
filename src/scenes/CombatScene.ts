@@ -5,8 +5,7 @@ import { getLevel } from '../combat/levels';
 import { problemText } from '../combat/problems';
 import type { CombatEvent, Enemy } from '../combat/types';
 
-// GREYBOX: plain shapes standing in for art. Positions come from laneLayout.ts,
-// rules from CombatModel; this scene only draws state and reacts to events.
+// This scene only draws state and reacts to events.
 
 const WIZARD_X = 210;
 const WIZARD_Y = 400;
@@ -21,6 +20,12 @@ const MAX_FRAME_MS = 100;
 const KIND_COLORS: Record<string, number> = {
   pencil: 0xf2c14e,
   textbook: 0xc0392b,
+  miniBoss: 0x862e9c,
+};
+
+/** Drawing size relative to a normal enemy. */
+const KIND_SIZES: Record<string, number> = {
+  miniBoss: 1.7,
 };
 
 interface EnemyView {
@@ -196,6 +201,9 @@ export class CombatScene extends Phaser.Scene {
         case 'playerDamaged':
           this.enemyAttacks(event.enemyId);
           break;
+        case 'announcement':
+          this.showBanner(event.text);
+          break;
         case 'cutsceneStarted':
           this.playCutscene(event.id);
           break;
@@ -264,7 +272,7 @@ export class CombatScene extends Phaser.Scene {
     for (const enemy of this.model.getEnemies()) {
       const view = this.enemyViews.get(enemy.id) ?? this.createEnemyView(enemy);
       const { x, y, scale } = project(enemy.lane, enemy.progress);
-      view.container.setPosition(x, y).setScale(scale).setDepth(y);
+      view.container.setPosition(x, y).setScale(scale * (KIND_SIZES[enemy.kind.id] ?? 1)).setDepth(y);
       view.problem.setText(problemText(enemy.problem));
       view.hpFill.scaleX = enemy.hp / enemy.kind.maxHp;
       view.body.setStrokeStyle(3, enemy.state === 'attacking' ? 0xff0000 : 0x000000);
@@ -310,6 +318,8 @@ export class CombatScene extends Phaser.Scene {
   private playCutscene(id: string): void {
     if (id === 'bossTwist') {
       void this.playBossTwist(this.model);
+    } else if (id === 'bossTaunt') {
+      void this.playBossTaunt(this.model);
     } else {
       // Unknown cutscene id: resume instead of leaving the game frozen.
       console.warn(`No animation for cutscene "${id}"`);
@@ -319,14 +329,11 @@ export class CombatScene extends Phaser.Scene {
 
   /** The module boss flies in, turns + into ×, then flies out. GREYBOX: a rectangle stands in for the boss art. */
   private async playBossTwist(model: CombatModel): Promise<void> {
-    const boss = this.add.container(1420, 40, [
-      this.add.rectangle(0, 0, 150, 100, 0x7048e8).setStrokeStyle(4, 0xffffff),
-      this.add.text(0, 0, 'BOSS', { fontFamily: 'Arial', fontSize: '28px', color: '#ffffff' }).setOrigin(0.5),
-    ]).setDepth(9800);
+    const boss = this.createBoss();
 
     // Let the player read the addition problems first.
     await this.wait(1500);
-    await this.tweenTo({ targets: boss, x: 820, y: 130, duration: 1200, ease: 'Sine.easeOut' });
+    await this.flyIn(boss);
     this.say(boss, 'Adding? How boring...');
     await this.wait(1500);
 
@@ -341,20 +348,53 @@ export class CombatScene extends Phaser.Scene {
     // The laugh starts before the boss leaves and stays attached to it on the way out.
     this.say(boss, 'Hehehehehe!!!');
     await this.wait(600);
-    await this.tweenTo({ targets: boss, x: 1420, y: -120, duration: 1000, ease: 'Sine.easeIn' });
-    boss.destroy();
+    await this.flyOut(boss);
     if (this.model !== model) return;
     this.showBanner('+ became ×!');
     this.handleEvents(model.endCutscene());
   }
 
-  /** Speech bubble under the boss that follows it and fades out. */
-  private say(boss: Phaser.GameObjects.Container, text: string): void {
+  /** The module boss taunts the player and sends in the mini-boss, which spawns on the last line. */
+  private async playBossTaunt(model: CombatModel): Promise<void> {
+    const boss = this.createBoss();
+    await this.flyIn(boss);
+    this.say(boss, "Boy you think you're clever don't you...", 2200);
+    await this.wait(2600);
+    this.say(boss, 'See if you can handle this!', 1800);
+    await this.wait(2200);
+    if (this.model !== model) return;
+
+    this.say(boss, 'Go get him, big guy! Hehehehehe!!!!!', 2000);
+    // Play resumes now, so the mini-boss appears while the boss is still laughing.
+    this.handleEvents(model.endCutscene());
+    await this.wait(1000);
+    await this.flyOut(boss);
+  }
+
+  /** GREYBOX: a rectangle stands in for the boss art. Starts off-screen, top right. */
+  private createBoss(): Phaser.GameObjects.Container {
+    return this.add.container(1420, 40, [
+      this.add.rectangle(0, 0, 150, 100, 0x7048e8).setStrokeStyle(4, 0xffffff),
+      this.add.text(0, 0, 'BOSS', { fontFamily: 'Arial', fontSize: '28px', color: '#ffffff' }).setOrigin(0.5),
+    ]).setDepth(9800);
+  }
+
+  private flyIn(boss: Phaser.GameObjects.Container): Promise<void> {
+    return this.tweenTo({ targets: boss, x: 820, y: 130, duration: 1200, ease: 'Sine.easeOut' });
+  }
+
+  private async flyOut(boss: Phaser.GameObjects.Container): Promise<void> {
+    await this.tweenTo({ targets: boss, x: 1420, y: -120, duration: 1000, ease: 'Sine.easeIn' });
+    boss.destroy();
+  }
+
+  /** Speech bubble under the boss that follows it, then fades out after holdMs. */
+  private say(boss: Phaser.GameObjects.Container, text: string, holdMs = 1400): void {
     const speech = this.add.text(0, 80, text, {
       fontFamily: 'Arial', fontSize: '24px', color: '#111111', backgroundColor: '#ffffff', padding: { x: 12, y: 6 },
     }).setOrigin(0.5);
     boss.add(speech);
-    this.tweens.add({ targets: speech, alpha: 0, delay: 1400, duration: 300, onComplete: () => speech.destroy() });
+    this.tweens.add({ targets: speech, alpha: 0, delay: holdMs, duration: 300, onComplete: () => speech.destroy() });
   }
 
   private zap(boss: Phaser.GameObjects.Container, view: EnemyView): void {
