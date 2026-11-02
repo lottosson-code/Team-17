@@ -8,13 +8,23 @@ import { soundManager } from '../audio/soundManager';
 import { mapProgressStore } from '../state/mapProgressStore';
 import '../ui/modal.css';
 
+export interface MainMenuSceneData {
+  showMap?: boolean;
+  roomIndex?: number;
+}
+
 export class MainMenuScene extends Phaser.Scene {
   public ui: GameUIController | null = null;
   public settingsModal: SettingsModalController | null = null;
   public quitModal: QuitModalController | null = null;
+  private initialData?: MainMenuSceneData;
 
   constructor() {
     super('MainMenu');
+  }
+
+  init(data?: MainMenuSceneData): void {
+    this.initialData = data;
   }
 
   create(): void {
@@ -34,6 +44,7 @@ export class MainMenuScene extends Phaser.Scene {
         callbacks: {
           newGame: () => {
             soundManager.playSfx('click');
+            mapProgressStore.resetProgress();
             ui.showMap();
           },
           continue: () => {
@@ -95,6 +106,10 @@ export class MainMenuScene extends Phaser.Scene {
     });
 
     this.ui = ui;
+
+    if (this.initialData?.showMap) {
+      ui.showMap(this.initialData.roomIndex);
+    }
 
     const onButtonHover = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;

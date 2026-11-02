@@ -240,6 +240,7 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
     element: root,
     getState: () => ({ ...state }),
     showRooms,
+    showIslands,
     focus(): void {
       if (!destroyed) content.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
     },

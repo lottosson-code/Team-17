@@ -37,6 +37,7 @@ export interface MapController {
   // Returns a copy. Changing it does not change the map.
   getState(): Readonly<MapState>;
   showRooms(): void;
+  showIslands?(roomIndex: number): void;
   // Focus the first destination button after the host makes the map visible.
   focus(): void;
   destroy(): void;

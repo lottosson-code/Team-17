@@ -22,7 +22,7 @@ export interface GameUIController {
   // Called by map Main Menu or by gameplay's return-to-menu callback.
   showMainMenu(): void;
   // Called by menu Map or by gameplay's return-to-map callback.
-  showMap(): void;
+  showMap(roomIndex?: number): void;
   // Call when removing this UI permanently, not when merely switching scenes.
   destroy(): void;
 }

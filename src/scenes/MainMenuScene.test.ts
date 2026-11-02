@@ -122,6 +122,7 @@ vi.mock('../ui/quitModal', () => ({
 
 import { MainMenuScene } from './MainMenuScene';
 import { soundManager } from '../audio/soundManager';
+import { mapProgressStore } from '../state/mapProgressStore';
 
 describe('MainMenuScene', () => {
   let scene: MainMenuScene;
@@ -145,27 +146,38 @@ describe('MainMenuScene', () => {
     expect(scene.ui).not.toBeNull();
   });
 
-  it('navigates to map and plays click sound when newGame is clicked', () => {
+  it('navigates directly to map when initialized with showMap: true', () => {
+    scene.init({ showMap: true, roomIndex: 0 });
     scene.create();
 
+    expect(mockGameUIController.showMap).toHaveBeenCalledWith(0);
+  });
+
+  it('navigates to map, resets progress, and plays click sound when newGame is clicked', () => {
+    scene.create();
+
+    const resetProgressSpy = vi.spyOn(mapProgressStore, 'resetProgress');
     const newGameCb = capturedGameUIOptions.menu?.callbacks?.newGame;
     expect(newGameCb).toBeDefined();
 
     newGameCb!({ action: 'newGame' });
 
     expect(playSfxSpy).toHaveBeenCalledWith('click');
+    expect(resetProgressSpy).toHaveBeenCalledTimes(1);
     expect(mockGameUIController.showMap).toHaveBeenCalledTimes(1);
   });
 
-  it('navigates to map and plays click sound when continue is clicked', () => {
+  it('navigates to map and plays click sound without resetting progress when continue is clicked', () => {
     scene.create();
 
+    const resetProgressSpy = vi.spyOn(mapProgressStore, 'resetProgress');
     const continueCb = capturedGameUIOptions.menu?.callbacks?.continue;
     expect(continueCb).toBeDefined();
 
     continueCb!({ action: 'continue' });
 
     expect(playSfxSpy).toHaveBeenCalledWith('click');
+    expect(resetProgressSpy).not.toHaveBeenCalled();
     expect(mockGameUIController.showMap).toHaveBeenCalledTimes(1);
   });
 

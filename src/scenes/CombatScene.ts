@@ -51,7 +51,10 @@ export class CombatScene extends Phaser.Scene {
     winTrigger.onclick = () => {
       soundManager.playSfx('start');
       mapProgressStore.completeLevel(this.moduleId, this.levelId);
-      this.scene.start('MainMenu');
+      this.scene.start('MainMenu', {
+        showMap: true,
+        roomIndex: this.moduleId - 1,
+      });
     };
     host.element.append(winTrigger);
     const pause = createPauseMenu(host.element, {
@@ -73,7 +76,13 @@ export class CombatScene extends Phaser.Scene {
           });
           if (!signal.aborted) menu.setVisible(true);
         },
-        quit: () => { this.scene.resume(); this.scene.start('MainMenu'); },
+        quit: () => {
+          this.scene.resume();
+          this.scene.start('MainMenu', {
+            showMap: true,
+            roomIndex: this.moduleId - 1,
+          });
+        },
       },
     });
     const open = (): void => {
