@@ -43,20 +43,22 @@ export class SoundManager {
 
   private initAudioContext(): void {
     try {
-      if (typeof window !== 'undefined') {
-        const AudioCtxClass =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        if (AudioCtxClass) {
-          this.ctx = new AudioCtxClass();
-          this.sfxGainNode = this.ctx.createGain();
-          this.musicGainNode = this.ctx.createGain();
+      const AudioCtxClass =
+        (typeof window !== 'undefined' &&
+          (window.AudioContext ||
+            (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)) ||
+        (typeof globalThis !== 'undefined' &&
+          (globalThis as unknown as { AudioContext?: typeof AudioContext }).AudioContext);
 
-          this.sfxGainNode.connect(this.ctx.destination);
-          this.musicGainNode.connect(this.ctx.destination);
+      if (AudioCtxClass) {
+        this.ctx = new AudioCtxClass();
+        this.sfxGainNode = this.ctx.createGain();
+        this.musicGainNode = this.ctx.createGain();
 
-          this.updateVolumes();
-        }
+        this.sfxGainNode.connect(this.ctx.destination);
+        this.musicGainNode.connect(this.ctx.destination);
+
+        this.updateVolumes();
       }
     } catch {
       this.ctx = null;

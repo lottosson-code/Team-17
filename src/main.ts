@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { MainMenuScene } from './scenes/MainMenuScene';
-import { WorldMapScene } from './scenes/WorldMapScene';
-import { LevelSelectScene } from './scenes/LevelSelectScene';
 import { CombatScene } from './scenes/CombatScene';
+import '../main menu/game-ui.css';
+import '../pause menu/pause-menu.css';
+import './ui/game-ui.css';
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -14,5 +15,5 @@ new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [MainMenuScene, WorldMapScene, LevelSelectScene, CombatScene],
+  scene: [MainMenuScene, CombatScene],
 });

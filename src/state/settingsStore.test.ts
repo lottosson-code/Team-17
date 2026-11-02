@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SettingsStore, SETTINGS_STORAGE_KEY } from './settingsStore';
+import { SettingsStore, SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS } from './settingsStore';
 
 class MockStorage implements Storage {
   private data = new Map<string, string>();
+  public shouldThrowOnSet = false;
+  public shouldThrowOnGet = false;
+
   get length(): number {
     return this.data.size;
   }
@@ -10,9 +13,11 @@ class MockStorage implements Storage {
     this.data.clear();
   }
   getItem(key: string): string | null {
+    if (this.shouldThrowOnGet) throw new Error('SecurityError: Access Denied');
     return this.data.has(key) ? this.data.get(key)! : null;
   }
   setItem(key: string, value: string): void {
+    if (this.shouldThrowOnSet) throw new Error('QuotaExceededError');
     this.data.set(key, String(value));
   }
   removeItem(key: string): void {
@@ -49,6 +54,14 @@ describe('settingsStore', () => {
     expect(settings.difficulty).toBe('Normal');
   });
 
+  it('exposes direct property getters', () => {
+    const store = SettingsStore.getInstance();
+    expect(store.musicVolume).toBe(70);
+    expect(store.sfxVolume).toBe(80);
+    expect(store.muted).toBe(false);
+    expect(store.difficulty).toBe('Normal');
+  });
+
   it('clamps setMusicVolume and setSfxVolume between 0 and 100', () => {
     const store = SettingsStore.getInstance();
 
@@ -71,6 +84,16 @@ describe('settingsStore', () => {
     expect(store.getSettings().sfxVolume).toBe(65);
   });
 
+  it('handles NaN and non-finite volume numbers safely by clamping to 0', () => {
+    const store = SettingsStore.getInstance();
+
+    store.setMusicVolume(NaN);
+    expect(store.musicVolume).toBe(0);
+
+    store.setSfxVolume(Number.NaN);
+    expect(store.sfxVolume).toBe(0);
+  });
+
   it('toggles muted state and returns updated settings', () => {
     const store = SettingsStore.getInstance();
     expect(store.getSettings().muted).toBe(false);
@@ -82,6 +105,16 @@ describe('settingsStore', () => {
     const toggledBack = store.toggleMute();
     expect(toggledBack.muted).toBe(false);
     expect(store.getSettings().muted).toBe(false);
+  });
+
+  it('sets muted state explicitly via setMuted', () => {
+    const store = SettingsStore.getInstance();
+
+    store.setMuted(true);
+    expect(store.muted).toBe(true);
+
+    store.setMuted(false);
+    expect(store.muted).toBe(false);
   });
 
   it('sets difficulty to Easy, Normal, or Hard', () => {
@@ -97,7 +130,7 @@ describe('settingsStore', () => {
     expect(store.getSettings().difficulty).toBe('Normal');
   });
 
-  it('resets settings to default values', () => {
+  it('resets settings to default values via resetSettings and resetToDefaults', () => {
     const store = SettingsStore.getInstance();
     store.setMusicVolume(10);
     store.setSfxVolume(15);
@@ -109,6 +142,10 @@ describe('settingsStore', () => {
     expect(reset.sfxVolume).toBe(80);
     expect(reset.muted).toBe(false);
     expect(reset.difficulty).toBe('Normal');
+
+    store.setMusicVolume(20);
+    const resetAlias = store.resetToDefaults();
+    expect(resetAlias.musicVolume).toBe(70);
   });
 
   it('notifies subscribers upon settings changes and unsubscribes cleanly', () => {
@@ -123,6 +160,21 @@ describe('settingsStore', () => {
     unsubscribe();
     store.setMusicVolume(90);
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('safely continues notifying other subscribers even if one subscriber throws an error', () => {
+    const store = SettingsStore.getInstance();
+    const faultyListener = vi.fn().mockImplementation(() => {
+      throw new Error('Subscriber crash');
+    });
+    const goodListener = vi.fn();
+
+    store.subscribe(faultyListener);
+    store.subscribe(goodListener);
+
+    expect(() => store.setMusicVolume(50)).not.toThrow();
+    expect(faultyListener).toHaveBeenCalled();
+    expect(goodListener).toHaveBeenCalledWith(expect.objectContaining({ musicVolume: 50 }));
   });
 
   it('persists settings to localStorage under team17_math_rpg_settings_v1', () => {
@@ -143,6 +195,22 @@ describe('settingsStore', () => {
     expect(restoredStore.getSettings().difficulty).toBe('Hard');
   });
 
+  it('survives localStorage quota or permission exceptions during setItem using memory fallback', () => {
+    const store = SettingsStore.getInstance();
+    mockStorage.shouldThrowOnSet = true;
+
+    expect(() => store.setMusicVolume(42)).not.toThrow();
+    expect(store.musicVolume).toBe(42);
+  });
+
+  it('survives localStorage access denial during loadSettings and falls back to defaults', () => {
+    mockStorage.shouldThrowOnGet = true;
+    SettingsStore.resetInstance();
+
+    const store = SettingsStore.getInstance();
+    expect(store.getSettings()).toEqual(DEFAULT_SETTINGS);
+  });
+
   it('gracefully handles corrupted data in localStorage and falls back to defaults', () => {
     mockStorage.setItem(SETTINGS_STORAGE_KEY, '{ broken json');
     SettingsStore.resetInstance();
@@ -150,5 +218,17 @@ describe('settingsStore', () => {
 
     expect(store.getSettings().musicVolume).toBe(70);
     expect(store.getSettings().difficulty).toBe('Normal');
+  });
+
+  it('filters out invalid difficulty strings from localStorage and falls back to Normal', () => {
+    mockStorage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify({ musicVolume: 50, sfxVolume: 50, muted: false, difficulty: 'SuperNightmare' })
+    );
+    SettingsStore.resetInstance();
+    const store = SettingsStore.getInstance();
+
+    expect(store.getSettings().difficulty).toBe('Normal');
+    expect(store.getSettings().musicVolume).toBe(50);
   });
 });

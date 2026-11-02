@@ -62,6 +62,13 @@ export class SettingsStore {
     return this.getSettings();
   }
 
+  public setMuted(muted: boolean): GameSettings {
+    this.settings.muted = Boolean(muted);
+    this.saveSettings();
+    this.notify();
+    return this.getSettings();
+  }
+
   public setDifficulty(difficulty: GameDifficulty): GameSettings {
     this.settings.difficulty = difficulty;
     this.saveSettings();
@@ -74,6 +81,26 @@ export class SettingsStore {
     this.saveSettings();
     this.notify();
     return this.getSettings();
+  }
+
+  public resetToDefaults(): GameSettings {
+    return this.resetSettings();
+  }
+
+  public get musicVolume(): number {
+    return this.settings.musicVolume;
+  }
+
+  public get sfxVolume(): number {
+    return this.settings.sfxVolume;
+  }
+
+  public get muted(): boolean {
+    return this.settings.muted;
+  }
+
+  public get difficulty(): GameDifficulty {
+    return this.settings.difficulty;
   }
 
   public subscribe(listener: (settings: GameSettings) => void): () => void {
