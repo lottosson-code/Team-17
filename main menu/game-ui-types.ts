@@ -1,10 +1,11 @@
 import type { MainMenuOptions } from './types.js';
-import type { LevelSelection, MapState } from '../map/index.js';
+import type { LevelSelection, MapOptions, MapState } from '../map/index.js';
 
 export interface GameUIOptions {
   // New Game, Continue, Settings and Quit are forwarded to the host as usual.
   // The Map action is reserved for the built-in menu-to-map navigation.
   menu?: MainMenuOptions;
+  map?: MapOptions;
   // Island Level N -> host receives IDs, hides the UI and opens gameplay.
   // The destination receives a return callback that calls showMap/showMainMenu.
   onLevelSelect?: (selection: LevelSelection) => void;

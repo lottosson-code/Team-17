@@ -5,6 +5,7 @@ import { toGameplaySelection } from '../ui/levelSelection';
 import { createSettingsModal, SettingsModalController } from '../ui/settingsModal';
 import { createQuitModal, QuitModalController } from '../ui/quitModal';
 import { soundManager } from '../audio/soundManager';
+import { mapProgressStore } from '../state/mapProgressStore';
 import '../ui/modal.css';
 
 export class MainMenuScene extends Phaser.Scene {
@@ -22,6 +23,13 @@ export class MainMenuScene extends Phaser.Scene {
     soundManager.startMenuMusic();
 
     const ui = createGameUI(host.element, {
+      map: {
+        isRoomUnlocked: (roomIndex) => mapProgressStore.isModuleUnlocked(roomIndex + 1),
+        isLevelUnlocked: (roomIndex, levelNum) =>
+          mapProgressStore.isLevelUnlocked(roomIndex + 1, levelNum),
+        isLevelCompleted: (roomIndex, levelNum) =>
+          mapProgressStore.isLevelCompleted(roomIndex + 1, levelNum),
+      },
       menu: {
         callbacks: {
           newGame: () => {

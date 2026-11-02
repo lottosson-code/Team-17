@@ -119,34 +119,6 @@
   cursor: pointer;
 }
 
-.cse-difficulty-group {
-  display: flex;
-  gap: 6px;
-}
-
-.cse-difficulty-btn {
-  padding: 6px 14px;
-  border: 1px solid #b99c67;
-  background: #32473c;
-  color: #ffffff;
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 14px;
-  transition: background 0.15s, color 0.15s;
-}
-
-.cse-difficulty-btn:hover {
-  background: #40594c;
-}
-
-.cse-difficulty-btn--active {
-  background: #b99c67;
-  color: #17172d;
-  font-weight: bold;
-  border-color: #fff0be;
-}
-
 .cse-modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -199,7 +171,6 @@
 }
 
 .cse-modal-btn:focus-visible,
-.cse-difficulty-btn:focus-visible,
 .cse-modal-close-btn:focus-visible,
 .cse-settings-slider-wrap input[type="range"]:focus-visible,
 .cse-settings-row--checkbox input[type="checkbox"]:focus-visible {

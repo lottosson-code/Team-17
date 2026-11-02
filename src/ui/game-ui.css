@@ -9,3 +9,12 @@
   pointer-events: auto; cursor: pointer;
 }
 .game-pause-trigger:focus-visible { outline: 2px solid #fff0be; outline-offset: 3px; }
+
+.game-victory-trigger {
+  position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 6;
+  padding: 12px 28px; border: 2px solid #b99c67; border-radius: 4px;
+  background: #23352c; color: #fff0be; font: bold 18px 'Trebuchet MS', sans-serif;
+  pointer-events: auto; cursor: pointer; transition: background 0.15s;
+}
+.game-victory-trigger:hover { background: #32473c; }
+.game-victory-trigger:focus-visible { outline: 2px solid #fff0be; outline-offset: 3px; }

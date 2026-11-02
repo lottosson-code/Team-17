@@ -1,7 +1,11 @@
 import Phaser from 'phaser';
 import { createPauseMenu } from '../../pause menu/index.js';
 import { createSceneOverlay } from '../ui/sceneOverlay';
+import { createSettingsModal } from '../ui/settingsModal';
+import { soundManager } from '../audio/soundManager';
+import { mapProgressStore } from '../state/mapProgressStore';
 import type { GameplaySelection } from '../ui/levelSelection';
+import '../ui/modal.css';
 
 export class CombatScene extends Phaser.Scene {
   private moduleId = 1;
@@ -39,12 +43,36 @@ export class CombatScene extends Phaser.Scene {
     // placeholder：Gameplay control opening the independent pause window.
     trigger.textContent = 'Pause';
     host.element.append(trigger);
+
+    const winTrigger = document.createElement('button');
+    winTrigger.type = 'button';
+    winTrigger.className = 'game-victory-trigger';
+    winTrigger.textContent = 'Complete Level (Victory)';
+    winTrigger.onclick = () => {
+      soundManager.playSfx('start');
+      mapProgressStore.completeLevel(this.moduleId, this.levelId);
+      this.scene.start('MainMenu');
+    };
+    host.element.append(winTrigger);
     const pause = createPauseMenu(host.element, {
       visible: false,
-      disabled: { settings: true },
       callbacks: {
         resume: ({ menu }) => { trigger.hidden = false; menu.setVisible(false); this.scene.resume(); },
         restart: () => { this.scene.resume(); this.scene.restart({ moduleId: this.moduleId, levelId: this.levelId, activity: this.activity }); },
+        settings: async ({ menu, signal }) => {
+          soundManager.playSfx('modalOpen');
+          menu.setVisible(false);
+          await new Promise<void>((resolve) => {
+            createSettingsModal(host.element, {
+              signal,
+              onClose: () => {
+                soundManager.playSfx('modalClose');
+                resolve();
+              },
+            });
+          });
+          if (!signal.aborted) menu.setVisible(true);
+        },
         quit: () => { this.scene.resume(); this.scene.start('MainMenu'); },
       },
     });

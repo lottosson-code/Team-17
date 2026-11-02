@@ -23,6 +23,7 @@ export function createGameUI(host: HTMLElement, options: GameUIOptions = {}): Ga
     callbacks: { ...menuOptions.callbacks, map: showMap },
   });
   const map = createMap(mapHost, {
+    ...options.map,
     onBackToMenu: showMainMenu,
     onLevelSelect: options.onLevelSelect,
   });

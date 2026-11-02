@@ -215,21 +215,8 @@ describe('SettingsModal', () => {
     playSfxSpy.mockRestore();
   });
 
-  it('updates difficulty in settingsStore and sets active button state', () => {
-    createSettingsModal(host as unknown as HTMLElement);
-
-    const diffButtons = findAllElementsBy(host, (el) => el.className.includes('cse-difficulty-btn'));
-    const hardBtn = diffButtons.find((b) => b.dataset.diff === 'Hard')!;
-
-    hardBtn.click();
-
-    expect(settingsStore.difficulty).toBe('Hard');
-    expect(hardBtn.classList.contains('cse-difficulty-btn--active')).toBe(true);
-  });
-
   it('resets inputs and store to defaults on Reset Defaults click', () => {
     settingsStore.setMusicVolume(10);
-    settingsStore.setDifficulty('Hard');
 
     createSettingsModal(host as unknown as HTMLElement);
 
@@ -237,7 +224,6 @@ describe('SettingsModal', () => {
     resetBtn.click();
 
     expect(settingsStore.musicVolume).toBe(70);
-    expect(settingsStore.difficulty).toBe('Normal');
 
     const musicInput = findElementBy(host, (el) => el.id === 'cse-music-vol')!;
     expect(musicInput.value).toBe('70');

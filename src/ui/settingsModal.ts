@@ -1,4 +1,4 @@
-import { settingsStore, GameDifficulty } from '../state/settingsStore';
+import { settingsStore } from '../state/settingsStore';
 import { soundManager } from '../audio/soundManager';
 
 export interface SettingsModalOptions {
@@ -116,32 +116,7 @@ export function createSettingsModal(
 
   muteRow.append(muteLabel, muteInput);
 
-  // Difficulty row
-  const diffRow = doc.createElement('div');
-  diffRow.className = 'cse-settings-row';
-
-  const diffLabel = doc.createElement('label');
-  diffLabel.textContent = 'Difficulty';
-
-  const diffGroup = doc.createElement('div');
-  diffGroup.className = 'cse-difficulty-group';
-
-  const diffButtons: HTMLButtonElement[] = [];
-  const difficulties: GameDifficulty[] = ['Easy', 'Normal', 'Hard'];
-
-  difficulties.forEach((diff) => {
-    const btn = doc.createElement('button');
-    btn.type = 'button';
-    btn.className = `cse-difficulty-btn${initialSettings.difficulty === diff ? ' cse-difficulty-btn--active' : ''}`;
-    btn.textContent = diff;
-    btn.dataset.diff = diff;
-    diffButtons.push(btn);
-    diffGroup.append(btn);
-  });
-
-  diffRow.append(diffLabel, diffGroup);
-
-  body.append(musicRow, sfxRow, muteRow, diffRow);
+  body.append(musicRow, sfxRow, muteRow);
 
   // Footer
   const footer = doc.createElement('div');
@@ -189,17 +164,6 @@ export function createSettingsModal(
     soundManager.playSfx('click');
   };
 
-  diffButtons.forEach((btn) => {
-    btn.onclick = () => {
-      const diff = btn.dataset.diff as GameDifficulty;
-      settingsStore.setDifficulty(diff);
-      soundManager.playSfx('click');
-      diffButtons.forEach((b) =>
-        b.classList.toggle('cse-difficulty-btn--active', b.dataset.diff === diff)
-      );
-    };
-  });
-
   resetBtn.onclick = () => {
     settingsStore.resetToDefaults();
     soundManager.playSfx('click');
@@ -209,9 +173,6 @@ export function createSettingsModal(
     sfxInput.value = String(reset.sfxVolume);
     sfxVal.textContent = `${reset.sfxVolume}%`;
     muteInput.checked = reset.muted;
-    diffButtons.forEach((b) =>
-      b.classList.toggle('cse-difficulty-btn--active', b.dataset.diff === reset.difficulty)
-    );
   };
 
   let destroyed = false;
@@ -235,7 +196,6 @@ export function createSettingsModal(
     musicInput,
     sfxInput,
     muteInput,
-    ...diffButtons,
     resetBtn,
     doneBtn,
   ];

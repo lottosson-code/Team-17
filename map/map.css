@@ -34,6 +34,28 @@
 .cse-map__island:hover .cse-map__sprite { filter: drop-shadow(0 .7cqw .8cqw #020a10aa) brightness(1.12); }
 .cse-map__room:hover .cse-map__label, .cse-map__island:hover .cse-map__label { color: #fff9e5; text-shadow: 0 0 .6cqw #d8b56a88, 0 .15cqw .35cqw #020810; }
 
+/* Locked states for rooms and islands */
+.cse-map__room[disabled],
+.cse-map__island[disabled] {
+  opacity: 0.38;
+  filter: grayscale(0.85);
+  cursor: not-allowed;
+}
+
+.cse-map__room[disabled] .cse-map__room-area,
+.cse-map__room[disabled] .cse-map__label,
+.cse-map__island[disabled] .cse-map__island-area,
+.cse-map__island[disabled] .cse-map__label {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.cse-map__room[disabled]:hover .cse-map__label,
+.cse-map__island[disabled]:hover .cse-map__label {
+  color: inherit;
+  text-shadow: none;
+}
+
 /* A soft mask fades all four edges without adding a visible border. */
 .cse-map .cse-map__back { position: absolute; z-index: 3; top: 5.5%; left: 3%; padding: 1cqw 1.8cqw; border-radius: 1cqw; background: #755638d9; color: #fff4d8; font-size: 1.65cqw; cursor: pointer; mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent), linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent); mask-composite: intersect; }
 .cse-map__back::before { content: '←'; margin-right: .65cqw; }
