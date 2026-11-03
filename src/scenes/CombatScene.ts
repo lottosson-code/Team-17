@@ -11,7 +11,6 @@ import { createTextures } from '../combat/view/textures';
 import { CURSED_CLASSROOM, DEPTH, enemyArt, themeTextures, wizardFeet } from '../combat/view/theme';
 import { WizardSprite } from '../combat/view/WizardSprite';
 import { mapProgressStore } from '../state/mapProgressStore';
-import type { GameplaySelection } from '../ui/levelSelection';
 
 // This scene only draws state and reacts to events.
 
@@ -23,7 +22,6 @@ const THEME = CURSED_CLASSROOM;
 export class CombatScene extends Phaser.Scene {
   private moduleId = 1;
   private levelId = 1;
-  private activity: GameplaySelection['activity'] = 'level';
 
   private model!: CombatModel;
   private battlefield!: Battlefield;
@@ -44,10 +42,9 @@ export class CombatScene extends Phaser.Scene {
     super('Combat');
   }
 
-  init(data: { moduleId?: number; levelId?: number; activity?: GameplaySelection['activity'] }): void {
+  init(data: { moduleId?: number; levelId?: number }): void {
     this.moduleId = data?.moduleId ?? 1;
     this.levelId = data?.levelId ?? 1;
-    this.activity = data?.activity ?? 'level';
     this.enemySprites = new Map();
     this.typed = '';
     this.wavesStarted = 0;
@@ -157,7 +154,7 @@ export class CombatScene extends Phaser.Scene {
 
   private restart(): void {
     this.time.paused = false;
-    this.scene.restart({ moduleId: this.moduleId, levelId: this.levelId, activity: this.activity });
+    this.scene.restart({ moduleId: this.moduleId, levelId: this.levelId });
   }
 
   private toMenu(): void {
@@ -167,26 +164,33 @@ export class CombatScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- events
 
-  private handleEvents(events: readonly CombatEvent[]): void {
+  private handleEvents(events: CombatEvent[]): void {
     for (const event of events) {
       switch (event.type) {
         case 'waveStarted':
-          this.wavesStarted = event.waveNumber;
+          this.wavesStarted = event.wave + 1;
+          this.hud.showBanner(event.isFinalWave ? 'FINAL WAVE!' : 'A huge wave is approaching!');
+          this.battlefield.gust();
+          this.battlefield.writeOnBoard([`Wave ${event.wave + 1}`, 'Stay sharp!']);
           break;
-        case 'playerHit':
-          this.effects.flashWhite();
-          this.effects.shake(0.006, 120);
-          this.hud.flashHp();
-          break;
-        case 'correctHit':
+        case 'hit':
           this.castAt(event.enemyId, event.damage);
+          break;
+        case 'enemyDefeated':
+          this.defeatEnemy(event.enemyId);
           break;
         case 'wrongAnswer':
           this.hud.flashInput('wrong');
-          this.effects.shake(0.003, 90);
+          this.wizard.scared();
           break;
-        case 'enemyDied':
-          this.defeatEnemy(event.enemyId);
+        case 'playerDamaged':
+          this.enemySprites.get(event.enemyId)?.attack();
+          this.wizard.hurt();
+          this.effects.shake(0.007, 160);
+          this.effects.callout(this.wizard.tip().add(new Phaser.Math.Vector2(-60, -110)), `-${event.damage}`, '#ff5c7a');
+          break;
+        case 'announcement':
+          this.hud.showBanner(event.text);
           break;
         case 'cutsceneStarted':
           this.playCutscene(event.id);
