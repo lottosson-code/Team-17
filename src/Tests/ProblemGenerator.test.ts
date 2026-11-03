@@ -1,12 +1,15 @@
-import {describe, expect, test } from "vitest";
+import {describe, expect, test, beforeEach} from "vitest";
 import PG from "../Math/ProblemGenerator";  //ProblemGenerator shortened to PG
+import MathProblem from "../Math/MathProblem";
 
-describe("PG, all answers should be in answers_list", () => {
-    test("add generates a correct Problem, is unique, has 20 answers," +
-        "and succesfully resets answers_list afterwards", 
-        () => {
+beforeEach(() => {
+    PG.reset();
+});
+
+describe("PG, testing the constructor on every ProblemType", () => {
+    test("addition, 20 unique", () => {
         for (let i = 0; i < 20; i++ ) {
-            let created: MathProblem = PG.add();
+            let created: MathProblem = new PG("addition");
             //Check type
             expect(created.operator).toBe("+");
             //Check equation
@@ -20,17 +23,11 @@ describe("PG, all answers should be in answers_list", () => {
         let answers: number[] = PG.answers();
         expect(answers.length).toBe(20);
         expect(answers.length == new Set(answers).size).toBe(true);
-
-        //Check reset replaces answers_list with a new list
-        PG.reset();
-        expect(PG.answers().length).toBe(0); 
     });
 
-    test("sub generates a correct Problem, is unique, has 20 answers," +
-        "and succesfully resets answers_list afterwards", 
-        () => {
+    test("subtraction", () => {
         for (let i = 0; i < 20; i++ ) {
-            let created: MathProblem = PG.sub();
+            let created: MathProblem = new PG("subtraction");
             //Check type
             expect(created.operator).toBe("-");
             //Check equation
@@ -44,28 +41,16 @@ describe("PG, all answers should be in answers_list", () => {
         let answers: number[] = PG.answers();
         expect(answers.length).toBe(20);
         expect(answers.length == new Set(answers).size).toBe(true);
-
-        //Check reset replaces answers_list with a new list
-        PG.reset();
-        expect(PG.answers().length).toBe(0);
     });
-    
-    test("add_or_sub generates a correct Problem, is unique, has 20 answers," +
-        "and succesfully resets answers_list afterwards", 
-        () => {
-        for (let i = 0; i < 20; i++ ) {
-            let created: MathProblem = PG.add_or_sub();
 
+    test("multiplication", () => {
+        for (let i = 0; i < 20; i++ ) {
+            let created: MathProblem = new PG("multiplication");
+            //Check type
+            expect(created.operator).toBe("x");
             //Check equation
-            if (created.operator == "+") {
-                expect(created.first_operand + 
-                    created.second_operand).toBe(created.result);
-            } else if (created.operator == "-") {
-                expect(created.first_operand - 
-                    created.second_operand).toBe(created.result);
-            } else { //If d is neither + or - which it should be
-                expect(true).toBe(false);
-            }
+            expect(created.first_operand * 
+                created.second_operand).toBe(created.result);
             //Check result in answers_list
             expect(PG.answers().includes(created.result)).toBe(true);
         }
@@ -75,8 +60,48 @@ describe("PG, all answers should be in answers_list", () => {
         expect(answers.length).toBe(20);
         expect(answers.length == new Set(answers).size).toBe(true);
 
-        //Check reset replaces answers_list with a new list
-        PG.reset();
-        expect(PG.answers().length).toBe(0);
+    });
+
+    test("division", () => {
+        //Because I kept division to the times tables, ie result can only be 
+        //1-12, I only generate 12 divisions, if we have a purely division 
+        //related level with more than 12 enemies, this functionality will need
+        //to change.
+        for (let i = 0; i < 12; i++ ) {
+            let created: MathProblem = new PG("division");
+            //Check type
+            expect(created.operator).toBe("/");
+            //Check equation
+            expect(created.first_operand / 
+                created.second_operand).toBe(created.result);
+            //Check result in answers_list
+            expect(PG.answers().includes(created.result)).toBe(true);
+        }
+
+        //Check answers_list has 12 unique entries
+        let answers: number[] = PG.answers();
+        expect(answers.length).toBe(12);
+        expect(answers.length == new Set(answers).size).toBe(true);
+    });
+});
+describe("ProblemGenerator remove function", () => {
+    test("1 answer in answers_list", () => {
+        let created: MathProblem = new PG("addition");
+        let answers: number[] = PG.answers();
+        expect(answers.length).toBe(1);
+        PG.remove(created.result);
+        expect(answers.length).toBe(0);
+    });
+    test("20 answers in answers_list", () => {
+        for (let i = 0; i < 20; i++) {
+            let created: MathProblem = new PG("addition");
+        }
+        let answers: number[] = PG.answers();
+        expect(answers.length).toBe(20);
+        let index = Math.round(Math.random() * 20);
+        let answer = answers[index];
+        PG.remove(answer);
+        expect(answers.length).toBe(19);
+        expect(answers.includes(answer)).toBe(false);
     });
 });
