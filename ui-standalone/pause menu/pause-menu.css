@@ -1,0 +1,239 @@
+/*
+ * LAYOUT CONFIGURATION GUIDE
+ * Load this stylesheet in the host page; importing index.js does not load it.
+ * There are three separate layout responsibilities:
+ *
+ * 1. HOST ELEMENT (configured by the game, outside this module)
+ *    The HTMLElement passed to createPauseMenu(host, options) must have
+ *    position: relative/absolute/fixed and a definite width and height.
+ *    Example: #game-overlay { position: absolute; inset: 0; pointer-events: none; }
+ *    #game-overlay > .cse-pause-menu { pointer-events: auto; }
+ *    The empty host must not block canvas clicks while the window is hidden.
+ *    Its parent game container must also be positioned and have a real size.
+ *
+ * 2. OVERLAY POSITION (the .cse-pause-menu rule below)
+ *    position + inset define the area covered by the transparent overlay.
+ *    place-items aligns the board within that area; padding reserves space
+ *    around it. z-index controls stacking inside the host's stacking context.
+ *
+ * 3. VISIBLE WINDOW SIZE (the .cse-pause-menu__board rule below)
+ *    width sets the board width; aspect-ratio derives its height.
+ *    Default maximum: 430px wide by 544px high, including the wooden frame.
+ *    Straps and shadows extend outside that rectangle.
+ *
+ * Edit these rules for project-wide defaults, or load a host-specific override
+ * AFTER this stylesheet. For a 360px maximum board near the host's top-left:
+ *
+ * #game-overlay > .cse-pause-menu {
+ *   place-items: start;
+ *   padding: 80px 0 0 64px;
+ * }
+ * #game-overlay > .cse-pause-menu .cse-pause-menu__board {
+ *   width: min(360px, 90cqw, calc(100cqh * .79));
+ * }
+ *
+ * The 80px/64px padding places the board below/right of the host's top-left.
+ * Keep top clearance for the straps. PauseMenuOptions has no layout fields.
+ */
+.cse-pause-menu {
+  /* Color/font defaults. Override through options.theme or scoped CSS. */
+  --pause-title-color: #fff0be;
+  --pause-title-font: Georgia, 'Palatino Linotype', 'Book Antiqua', serif;
+  --pause-body-font: 'Trebuchet MS', Candara, sans-serif;
+  --pause-panel-color: #293f35;
+  --pause-frame-color: #b99c67;
+  --pause-button-color: #755638;
+  --pause-button-hover-color: #826440;
+  --pause-button-text-color: #fff;
+  --pause-focus-color: #fff3b8;
+  position: absolute; /* Relative to the nearest positioned ancestor. */
+  inset: 0; /* Fill the host; change the host bounds to change the game area. */
+  z-index: 10; /* Raise this if the game's other overlay layers are higher. */
+  display: grid;
+  place-items: center; /* Board placement inside the padded overlay area. */
+  padding: 44px 16px 20px; /* Top 44px, left/right 16px, bottom 20px; room for straps. */
+  container-type: size; /* Supplies the board's cqw/cqh width/height units. */
+  isolation: isolate;
+  background: transparent;
+  font-family: var(--pause-body-font);
+}
+.cse-pause-menu, .cse-pause-menu * { box-sizing: border-box; }
+.cse-pause-menu[hidden] { display: none !important; }
+.cse-pause-menu__board {
+  position: relative;
+  container-type: inline-size; /* Child text and spacing scale with this board. */
+  /*
+   * MAIN SIZE SETTING: min(maximum width, 90% of overlay width, height limit).
+   * Here 1cqw/1cqh are 1% of the overlay's content width/height.
+   * Change 430px to resize the maximum while retaining responsive shrinking.
+   * The .79 height-limit multiplier approximates 430 / 544. If changing the
+   * aspect ratio below, update this multiplier to the new width/height ratio.
+   */
+  width: min(430px, 90cqw, calc(100cqh * .79));
+  aspect-ratio: 430 / 544; /* Derives height from width; do not set both blindly. */
+  padding: 0;
+  border: 13px solid var(--pause-frame-color);
+  border-image: linear-gradient(125deg,
+    color-mix(in srgb, var(--pause-frame-color) 82%, #fff0be),
+    color-mix(in srgb, var(--pause-frame-color) 80%, #503b29) 42%,
+    var(--pause-frame-color) 70%,
+    color-mix(in srgb, var(--pause-frame-color) 65%, #503b29)) 1;
+  background:
+    radial-gradient(ellipse at 22% 16%, #eee5b808, transparent 55%),
+    repeating-linear-gradient(173deg, #e7edce02 0 1px, transparent 1px 7px),
+    var(--pause-panel-color);
+  box-shadow: 0 0 0 2px #503b29, inset 0 0 0 2px #1b2d25, inset 0 0 28px #13261b55, 0 12px 24px #201c1926;
+  color: var(--pause-title-color);
+  outline: none;
+}
+/* Two short straps make the board feel suspended without drawing a ceiling. */
+.cse-pause-menu__hanger-left, .cse-pause-menu__hanger-right {
+  position: absolute;
+  z-index: -1;
+  top: -51px;
+  width: 11px;
+  height: 54px;
+  border: 1px solid #715334;
+  background: repeating-linear-gradient(35deg, #b59a64 0 6px, #80613e 6px 8px);
+  box-shadow: 2px 0 0 #31271b25;
+}
+.cse-pause-menu__hanger-left { left: 14%; }
+.cse-pause-menu__hanger-right { right: 14%; }
+.cse-pause-menu__hanger-left::after, .cse-pause-menu__hanger-right::after {
+  content: '';
+  position: absolute;
+  left: -5px;
+  bottom: -14px;
+  width: 19px;
+  height: 33px;
+  background: #7b603b;
+  border: 3px solid #d0b57c;
+  box-shadow: 0 1px 0 #322b21;
+}
+.cse-pause-menu__title {
+  margin: 0;
+  position: absolute;
+  top: 10.8%; /* Internal heading position relative to the board, not the game. */
+  left: 6%;
+  width: 88%;
+  color: var(--pause-title-color);
+  font-family: var(--pause-title-font);
+  font-size: 12.6cqw;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  overflow-wrap: anywhere;
+  text-shadow: 0 2px 0 #152b2355;
+}
+.cse-pause-menu__title::after {
+  content: '';
+  display: block;
+  width: 12%;
+  height: 2px;
+  margin: 5.8% auto 0;
+  background: #d6c38c;
+  border-radius: 50%;
+  opacity: .85;
+}
+.cse-pause-menu__actions {
+  position: absolute;
+  /* Internal button-group placement. These do not move the whole window. */
+  top: 31%;
+  left: 7.2%;
+  width: 85.6%;
+  height: 51.5%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.8cqw; /* Space between buttons, scaled to the board's content width. */
+  padding: 2cqw; /* Equal space around the four buttons. */
+  border: 1px solid #b99c677d;
+  background: #d0c29f;
+  box-shadow: 0 3px 8px #17271d40;
+}
+.cse-pause-menu__button {
+  appearance: none;
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  padding: 1cqw 2cqw;
+  border: 0;
+  border-radius: 1px;
+  background: var(--pause-button-color);
+  color: var(--pause-button-text-color);
+  font-family: var(--pause-body-font);
+  font-size: 5.8cqw;
+  font-weight: 400;
+  line-height: 1.15;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+@media (hover: hover) {
+  .cse-pause-menu__button:hover:not(:disabled) { background: var(--pause-button-hover-color); transform: translateY(-1px); }
+}
+.cse-pause-menu__button:active:not(:disabled) { transform: translateY(1px); }
+.cse-pause-menu__button:focus-visible { outline: 2px solid var(--pause-focus-color); outline-offset: 2px; }
+.cse-pause-menu__button:disabled { opacity: .5; cursor: not-allowed; }
+.cse-pause-menu[aria-busy='true'] .cse-pause-menu__button { cursor: progress; }
+.cse-pause-menu__corner-tl, .cse-pause-menu__corner-tr,
+.cse-pause-menu__corner-bl, .cse-pause-menu__corner-br {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  background: #e2c58b;
+  box-shadow: 1px 1px 0 #6c4c31;
+}
+.cse-pause-menu__corner-tl { top: -10px; left: -10px; }
+.cse-pause-menu__corner-tr { top: -10px; right: -9px; }
+.cse-pause-menu__corner-bl { bottom: -9px; left: -10px; }
+.cse-pause-menu__corner-br { bottom: -9px; right: -9px; }
+.cse-pause-menu__tray {
+  position: absolute;
+  bottom: 7.2%;
+  left: 19%;
+  width: 62%;
+  height: 1px;
+  background: #b9c2a23a;
+}
+.cse-pause-menu__tray::before {
+  content: '';
+  position: absolute;
+  bottom: 1px;
+  left: 8%;
+  width: 8cqw;
+  height: 1.1cqw;
+  border-radius: 1px;
+  background: #ded5b6;
+  transform: rotate(-3deg);
+  box-shadow: 0 1px 2px #10201955;
+}
+.cse-pause-menu__tray::after {
+  content: '';
+  position: absolute;
+  right: 6%;
+  bottom: 1px;
+  width: 10cqw;
+  height: 3.4cqw;
+  border-radius: 2px 2px 0 0;
+  border-bottom: 1cqw solid #25332b;
+  background: #ac9871;
+  transform: rotate(2deg);
+}
+.cse-pause-menu__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (max-height: 420px), (max-width: 420px) {
+  /* Viewport-based frame adjustment; board sizing still follows its host. */
+  .cse-pause-menu__board { border-width: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cse-pause-menu__button { transition: none; }
+}

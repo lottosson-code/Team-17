@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Team 17 UI preview</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>UI preview</h1>
+        <p>Explore the menu and map. Level selection is displayed here; gameplay is not loaded.</p>
+        <div class="preview-controls">
+          <button id="main-menu" type="button">Main menu</button>
+          <button id="pause-preview" type="button">Preview pause menu</button>
+        </div>
+        <p id="selection" role="status">No level selected.</p>
+      </header>
+      <div id="stage" class="preview-stage"></div>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
