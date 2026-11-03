@@ -18,17 +18,19 @@ export class LevelSelectScene extends Phaser.Scene {
       color: '#ffffff',
     }).setOrigin(0.5);
 
-    this.add.text(640, 395, 'Level 1', {
-      fontFamily: 'Arial',
-      fontSize: '32px',
-      color: '#ffffff',
-      backgroundColor: '#365fb0',
-    })
-      .setOrigin(0.5)
-      .setPadding(28, 18)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => {
-        this.scene.start('Combat', { moduleId: this.moduleId, levelId: 1 });
-      });
+    [1, 2].forEach((levelId, i) => {
+      this.add.text(640, 365 + i * 110, `Level ${levelId}`, {
+        fontFamily: 'Arial',
+        fontSize: '32px',
+        color: '#ffffff',
+        backgroundColor: '#365fb0',
+      })
+        .setOrigin(0.5)
+        .setPadding(28, 18)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => {
+          this.scene.start('Combat', { moduleId: this.moduleId, levelId });
+        });
+    });
   }
 }
