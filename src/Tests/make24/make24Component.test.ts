@@ -41,7 +41,7 @@ function find<T extends HTMLElement = HTMLElement>(selector: string): T {
 
 /** The four card positions, left to right. Empty positions are null. */
 function slots(): (HTMLButtonElement | null)[] {
-  return [...container.querySelectorAll('.cse-make24__cards > *')].map((el) =>
+  return Array.from(container.querySelectorAll('.cse-make24__cards > *')).map((el) =>
     el instanceof HTMLButtonElement ? el : null);
 }
 
@@ -52,7 +52,7 @@ function shownValues(): (string | null)[] {
     const whole = card.querySelector('.cse-make24__int');
     if (whole) return whole.textContent;
     const sign = card.querySelector('.cse-make24__sign')?.textContent ?? '';
-    const [top, bottom] = card.querySelectorAll('.cse-make24__frac > span');
+    const [top, bottom] = Array.from(card.querySelectorAll('.cse-make24__frac > span'));
     return `${sign}${top.textContent}/${bottom.textContent}`;
   });
 }
@@ -98,7 +98,7 @@ describe('starting a puzzle', () => {
     mount({ numbers: [4, 7, 8, 9] });
     expect(find('.cse-make24__log').textContent).toContain('Pick a number');
     expect(stat('coins')).toBe('0');
-    for (const op of container.querySelectorAll<HTMLButtonElement>('[data-op]')) {
+    for (const op of Array.from(container.querySelectorAll<HTMLButtonElement>('[data-op]'))) {
       expect(op.disabled).toBe(true);
     }
   });
