@@ -20,19 +20,24 @@ export function createGameUI(host: HTMLElement, options: GameUIOptions = {}): Ga
   const menuOptions = options.menu || {};
   const menu = createMainMenu(menuHost, {
     ...menuOptions,
-    callbacks: { ...menuOptions.callbacks, map: showMap },
+    callbacks: { ...menuOptions.callbacks, map: () => showMap() },
   });
   const map = createMap(mapHost, {
+    ...options.map,
     onBackToMenu: showMainMenu,
     onLevelSelect: options.onLevelSelect,
   });
 
-  function showMap(): void {
+  function showMap(roomIndex?: number): void {
     if (destroyed) return;
     menu.setVisible(false);
     menuHost.hidden = true;
     mapHost.hidden = false;
-    map.showRooms();
+    if (typeof roomIndex === 'number' && typeof map.showIslands === 'function') {
+      map.showIslands(roomIndex);
+    } else {
+      map.showRooms();
+    }
     map.focus();
     scene = 'map';
     root.dataset.scene = scene;

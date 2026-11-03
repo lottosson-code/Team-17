@@ -1,0 +1,179 @@
+/* Modal Overlays (Settings & Quit Confirmation) */
+.game-ui-host > .cse-modal-overlay { pointer-events: auto; }
+
+.cse-modal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(10, 16, 13, 0.78);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: cse-modal-fade-in 0.18s ease-out;
+  box-sizing: border-box;
+}
+
+@keyframes cse-modal-fade-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.cse-modal-card {
+  background: #23352c;
+  border: 4px solid #b99c67;
+  border-radius: 8px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), inset 0 0 12px rgba(0, 0, 0, 0.35);
+  color: #fff0be;
+  font-family: 'Trebuchet MS', Candara, sans-serif;
+  padding: 24px 30px;
+  width: 90%;
+  max-width: 480px;
+  box-sizing: border-box;
+}
+
+.cse-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #3a5345;
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+}
+
+.cse-modal-title {
+  margin: 0;
+  font-family: Georgia, 'Palatino Linotype', 'Book Antiqua', serif;
+  font-size: 26px;
+  color: #fff0be;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.cse-modal-close-btn {
+  background: transparent;
+  border: none;
+  color: #b99c67;
+  font-size: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.cse-modal-close-btn:hover {
+  color: #fff0be;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.cse-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cse-modal-desc {
+  font-size: 16px;
+  color: #e2dac2;
+  margin: 8px 0 16px;
+  line-height: 1.45;
+}
+
+.cse-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 16px;
+}
+
+.cse-settings-row label {
+  color: #fff0be;
+  font-weight: 500;
+}
+
+.cse-settings-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 58%;
+}
+
+.cse-settings-slider-wrap input[type="range"] {
+  flex: 1;
+  accent-color: #b99c67;
+  cursor: pointer;
+}
+
+.cse-settings-val {
+  min-width: 44px;
+  text-align: right;
+  font-weight: bold;
+  font-size: 15px;
+  color: #e6dfc8;
+}
+
+.cse-settings-row--checkbox input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: #b99c67;
+  cursor: pointer;
+}
+
+.cse-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 2px solid #3a5345;
+}
+
+.cse-modal-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.05s;
+}
+
+.cse-modal-btn:active {
+  transform: translateY(1px);
+}
+
+.cse-modal-btn--primary {
+  background: #755638;
+  color: #fff0be;
+}
+
+.cse-modal-btn--primary:hover {
+  background: #8e6843;
+}
+
+.cse-modal-btn--secondary {
+  background: #455a4e;
+  color: #e2dac2;
+}
+
+.cse-modal-btn--secondary:hover {
+  background: #556f60;
+}
+
+.cse-modal-btn--danger {
+  background: #8a2a2a;
+  color: #ffffff;
+}
+
+.cse-modal-btn--danger:hover {
+  background: #a63434;
+}
+
+.cse-modal-btn:focus-visible,
+.cse-modal-close-btn:focus-visible,
+.cse-settings-slider-wrap input[type="range"]:focus-visible,
+.cse-settings-row--checkbox input[type="checkbox"]:focus-visible {
+  outline: 2px solid #fff3b8;
+  outline-offset: 2px;
+}

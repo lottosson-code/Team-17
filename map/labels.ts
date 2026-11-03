@@ -3,16 +3,16 @@ export const MAP_TEXT = {
   // placeholder：Classroom selection screen title.
   classroomTitle: 'Classroom Map',
   // placeholder：Classroom button prefix, followed by its 1-based number.
-  classroomPrefix: 'Level ',
+  classroomPrefix: 'Classroom ',
   // placeholder：Accessible name of the map component.
   accessibleTitle: 'Classroom map',
   submapTitles: [
     // placeholder：First classroom's submap title.
-    'Level 1 Name',
+    'Classroom 1',
     // placeholder：Second classroom's submap title.
-    'Level 2 Name',
+    'Classroom 2',
     // placeholder：Third classroom's submap title.
-    'Level 3 Name',
+    'Classroom 3',
   ],
   levelNames: [
     // placeholder：First main-route island button name.

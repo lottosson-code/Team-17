@@ -25,12 +25,19 @@ export interface MapOptions {
   // Classroom Main Menu click -> ask the host to show its existing menu.
   // createGameUI provides this callback automatically.
   onBackToMenu?: () => void;
+  /** Optional progression guard: returns whether a classroom/room is unlocked (default: true). */
+  isRoomUnlocked?: (roomIndex: number) => boolean;
+  /** Optional progression guard: returns whether an island level is unlocked (default: true). */
+  isLevelUnlocked?: (roomIndex: number, levelNumber: number) => boolean;
+  /** Optional progression guard: returns whether an island level has been completed. */
+  isLevelCompleted?: (roomIndex: number, levelNumber: number) => boolean;
 }
 export interface MapController {
   readonly element: HTMLElement;
   // Returns a copy. Changing it does not change the map.
   getState(): Readonly<MapState>;
   showRooms(): void;
+  showIslands?(roomIndex: number): void;
   // Focus the first destination button after the host makes the map visible.
   focus(): void;
   destroy(): void;

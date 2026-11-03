@@ -66,13 +66,24 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
 
     classrooms.forEach((room, index) => {
       const button = createButton('cse-map__room');
+      const isUnlocked = options.isRoomUnlocked ? options.isRoomUnlocked(index) : true;
       button.dataset.roomId = room.id;
       button.style.setProperty('--room-index', String(index));
       const area = document.createElement('span');
       area.className = 'cse-map__room-area';
       area.setAttribute('aria-hidden', 'true');
-      button.append(area, createLabel(MAP_TEXT.classroomPrefix + (index + 1)));
-      button.onclick = () => showIslands(index);
+      const labelText = isUnlocked
+        ? MAP_TEXT.classroomPrefix + (index + 1)
+        : MAP_TEXT.classroomPrefix + (index + 1) + ' 🔒';
+      button.append(area, createLabel(labelText));
+
+      if (!isUnlocked) {
+        button.disabled = true;
+        button.setAttribute('aria-disabled', 'true');
+        button.title = `Module ${index + 1} Locked — Complete Module ${index} first`;
+      } else {
+        button.onclick = () => showIslands(index);
+      }
       content.append(button);
       if (room.id === previousRoom) button.focus({ preventScroll: true });
     });
@@ -142,6 +153,8 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
       if (!artwork) return;
       const button = createButton('cse-map__island');
       const levelId = room.id + '-level-0' + (index + 1);
+      const isUnlocked = options.isLevelUnlocked ? options.isLevelUnlocked(roomIndex, index + 1) : true;
+      const isCompleted = options.isLevelCompleted ? options.isLevelCompleted(roomIndex, index + 1) : false;
       const selected = state.selectedLevelId === levelId;
       button.dataset.levelId = levelId;
       button.dataset.route = island.route;
@@ -161,9 +174,21 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
       area.className = 'cse-map__island-area';
       area.style.clipPath = artwork.shape;
       area.setAttribute('aria-hidden', 'true');
-      const name = island.route === 'branch' ? MAP_TEXT.minigameNames[index - 5] : MAP_TEXT.levelNames[index];
+      let name = island.route === 'branch' ? MAP_TEXT.minigameNames[index - 5] : MAP_TEXT.levelNames[index];
+      if (isCompleted) {
+        name = '✓ ' + (name || '');
+      } else if (!isUnlocked) {
+        name = '🔒 ' + (name || '');
+      }
       button.append(sprite, area, createLabel(name || ''));
-      button.onclick = () => selectLevel(button, room.id, levelId, index + 1);
+
+      if (!isUnlocked) {
+        button.disabled = true;
+        button.setAttribute('aria-disabled', 'true');
+        button.title = 'Level Locked';
+      } else {
+        button.onclick = () => selectLevel(button, room.id, levelId, index + 1);
+      }
       content.append(button);
     });
     content.querySelector<HTMLButtonElement>('.cse-map__island')?.focus({ preventScroll: true });
@@ -215,6 +240,7 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
     element: root,
     getState: () => ({ ...state }),
     showRooms,
+    showIslands,
     focus(): void {
       if (!destroyed) content.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
     },
