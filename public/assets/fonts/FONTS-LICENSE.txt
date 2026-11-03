@@ -1,0 +1,11 @@
+Fonts bundled with the Make 24 minigame (subset to Latin characters, converted to WOFF).
+
+Lora (Lora-Variable.woff)
+  Copyright 2011 The Lora Project Authors (https://github.com/cyrealtype/Lora-Cyrillic)
+
+Poppins (Poppins-Regular.woff, Poppins-Bold.woff)
+  Copyright 2020 The Poppins Project Authors (https://github.com/itfoundry/Poppins)
+
+Both fonts are licensed under the SIL Open Font License, Version 1.1.
+Full license text: https://openfontlicense.org/open-font-license-official-text/
+Before shipping, save that license text next to this file as OFL.txt.
