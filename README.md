@@ -1,338 +1,457 @@
-# Team 17 – Math RPG
+# Team 17 — Math RPG and UI Modules
 
-A fantasy math game for grades 3–5, built with **Phaser 3 + TypeScript + Vite**. Players fight monsters by solving arithmetic problems, explore a classroom map, and play math minigames (Make 24, the Blacksmith's Armor Forge) to earn coins and upgrades.
+The actual game entry now uses the latest **Main Menu**, **Map** and independent **Pause Menu** modules. This is the single English README for their interfaces, shared artwork, layout settings and host-model wiring.
 
-| | |
-| --- | --- |
-| **Repository** | https://github.com/lottosson-code/Team-17 |
-| **Backlog (user stories)** | https://github.com/lottosson-code/Team-17/issues |
-| **CI (GitHub Actions)** | https://github.com/lottosson-code/Team-17/actions |
-| **Team documentation** | [Central doc (Google Docs)](https://docs.google.com/document/d/1tDDdLpe68Lj6zzUeSxWi1jh3r_CDwnUiyNUmfILgeLU/edit?tab=t.bqwmq1mqcsdu) |
-
-## Contents
-
-1. [Getting started](#getting-started)
-2. [Project status](#project-status)
-3. [Project structure](#project-structure)
-4. [Architecture overview](#architecture-overview)
-5. [Modules](#modules)
-   - [5.1 State management](#51-state-management-srcstate)
-   - [5.2 Procedural audio engine](#52-procedural-audio-engine-srcaudio)
-   - [5.3 Scenes and game flow](#53-scenes-and-game-flow-srcscenes)
-   - [5.4 UI modals and helpers](#54-ui-modals-and-helpers-srcui)
-   - [5.5 Combat / main level](#55-combat--main-level-srccombat)
-   - [5.6 Math engine and Enemy](#56-math-engine-and-enemy-srcmath-srcmainlevel)
-   - [5.7 Blacksmith minigame](#57-blacksmith-minigame-srcminigamesblacksmith)
-   - [5.8 Make 24 minigame](#58-make-24-minigame-srcminigamesmake24)
-6. [Testing](#testing)
-7. [Contributing](#contributing)
-8. [Team and ownership](#team-and-ownership)
-9. [Known issues and next steps](#known-issues-and-next-steps)
-
----
-
-## Getting started
-
-Requires **Node 22.12+** (see `.nvmrc`).
-
-```bash
-npm install       # install dependencies
-npm run dev       # start the dev server, then open the printed localhost link
-npm test          # run all unit tests once (Vitest)
-npm run build     # type-check and build for production
-```
-
-`npm run test:watch` reruns tests on every change, and `npm run typecheck` type-checks without building.
-
----
-
-## Project status
-
-| Area | Status | Pull requests |
-| --- | --- | --- |
-| Combat engine, Levels 1-1 and 1-2 | Merged | [#28](https://github.com/lottosson-code/Team-17/pull/28) |
-| Battlefield art, animations and HUD | Merged | [#31](https://github.com/lottosson-code/Team-17/pull/31), [#33](https://github.com/lottosson-code/Team-17/pull/33) |
-| Math engine and Enemy | Merged | [#24](https://github.com/lottosson-code/Team-17/pull/24), [#25](https://github.com/lottosson-code/Team-17/pull/25), [#30](https://github.com/lottosson-code/Team-17/pull/30) |
-| Make 24 minigame and tests | Merged | [#27](https://github.com/lottosson-code/Team-17/pull/27), [#32](https://github.com/lottosson-code/Team-17/pull/32) |
-| Blacksmith minigame | Merged | [#29](https://github.com/lottosson-code/Team-17/pull/29) |
-| CI workflow | Merged | [#23](https://github.com/lottosson-code/Team-17/pull/23) |
-| Main menu, map UI, settings, audio, progress tracking | Merged | [#26](https://github.com/lottosson-code/Team-17/pull/26) |
-
----
-
-## Project structure
+## Repository layout
 
 ```text
-.github/workflows/test.yml   CI: tests, type-check and build on every push and PR
-docs/art/ART_BRIEF.md        Art direction and prompts for the battlefield art
-public/assets/combat/        Enemy art and spritesheets (WebP), fonts
-scripts/                     Python tools that turn source art into WebP files and spritesheets
-src/
-  main.ts                    Phaser game config (1280×720) and scene list
-  scenes/                    Phaser scenes (menu, map, level select, combat)
-  combat/                    Combat rules (no Phaser): model, levels, problems, lane layout
-  combat/view/               Combat rendering (Phaser): battlefield, sprites, effects, HUD
-  Math/                      Math engine: ProblemGenerator, MathProblem
-  MainLevel/                 Enemy class used with the math engine
-  minigames/blacksmith/      Armor Forge minigame (MVC, Konva) and its tests
-  minigames/make24/          Make 24 minigame (HTML/CSS) with its own README
-  Tests/                     Unit tests for combat, math engine, Enemy and Make 24
-  ui/                        Shared UI helpers
-  state/, audio/             Stores and sound manager (in PR #26)
+Team-17/
+├── README.md
+├── assets/
+│   ├── index.ts                  Static URL registry used by Vite and the modules
+│   ├── main-menu/classroom.png    Empty night-classroom background
+│   ├── characters/*.png          Seven independent transparent monsters
+│   ├── icons/map.svg
+│   └── map/*.png                 Classrooms, dream, island atlas and bridge
+├── main menu/                    Current menu, character layout and map navigation
+├── map/                          Current classrooms/islands and route graph
+├── pause menu/                   Independent transparent CSS blackboard window
+├── src/
+│   ├── main.ts                   Actual application entry and stylesheet imports
+│   ├── scenes/MainMenuScene.ts   Mounts the latest menu/map modules
+│   ├── scenes/CombatScene.ts     Existing gameplay stage plus pause integration
+│   ├── ui/sceneOverlay.ts        Canvas-aligned DOM host and lifecycle cleanup
+│   └── ui/levelSelection.ts      Stable UI IDs -> gameplay selection metadata
+├── scripts/build-ui.mjs          Standalone build with styles and shared artwork
+└── package.json, package-lock.json, tsconfig.json, tsconfig.ui.json, vite.config.ts
 ```
 
----
+The previous WorldMapScene/LevelSelectScene and unused placeholder button helper have been removed. No browser demo, alternate art versions or process records are included in the game module directories. Dependencies and generated builds remain Git-ignored.
 
-## Architecture overview
+## Install, run and validate
+
+Use Node.js 22.12 or newer (the repository's .nvmrc selects Node 22). Run the real game from this repository root:
+
+```sh
+npm ci
+npm run dev
+```
+
+The startup screen displays Math Nightmare over the current empty classroom plus seven independent character layers. New Game, Continue and Map open the latest classroom selection. This current host adapter does not implement persistent saves; Continue reopens the map. Main-menu Settings/Quit Game remain host callback extension points. Selecting an island starts the project's gameplay scene with classroom/main-level/minigame metadata. During gameplay, Pause or Escape opens the independent pause window; Resume, Restart and Quit to Menu are wired. Pause Settings is disabled until the game supplies a settings screen.
+
+| Script | Purpose |
+|---|---|
+| `npm test` | Run existing math tests and UI/gameplay selection-mapping tests. |
+| `npm run typecheck` | Type-check the application, UI modules and asset registry. |
+| `npm run typecheck:ui` | Type-check the standalone UI modules and shared asset registry. |
+| `npm run build` | Build the real Vite game, including the current UI and root artwork. |
+| `npm run build:ui` | Build standalone UI modules, declarations, source maps, styles and artwork in dist/ui/. |
+| `npm run preview` | Serve the production game build. |
+| `npm run test:watch` | Run tests in watch mode. |
+
+The UI adds no third-party runtime dependency. Existing Phaser/Vite/TypeScript/Vitest dependencies and lockfile are retained. Standalone generated .js/.d.ts/.js.map files are isolated in dist/ui/ and ignored by Git. Source folders stay TypeScript-only so old generated JavaScript cannot shadow edited source. TypeScript imports keep .js suffixes for emitted browser modules. JavaScript imports do not load CSS automatically. The application imports all required CSS in src/main.ts.
+
+For standalone delivery, serve the contents of dist/ui/: the three emitted module directories plus their sibling assets/ directory together over HTTP. Do not open browser modules with file://. All root artwork URLs are statically analyzable and work in the Vite application build without the old dynamic-map-URL workaround.
+
+## Game model and lifecycle wiring
+
+MainMenuScene mounts createGameUI in a DOM host aligned with the actual FIT-scaled Phaser canvas. The host observes canvas/container resizing and disposes when its owning scene shuts down. Empty overlay areas let pointer events reach the canvas; actual UI roots/buttons opt into pointer events.
+
+The tested toGameplaySelection adapter maps classroom-01/02/03 to module IDs 1/2/3. Nodes 1..5 become activity: 'level' with levelId 1..5. Nodes 6..8 become activity: 'minigame' with levelId 1..3. selectionId retains the stable string ID. Unsupported rooms, node numbers and inconsistent IDs are rejected. This routes correct metadata; the team's current CombatScene remains the gameplay implementation and a dedicated minigame model can be attached later.
+
+Pause operates independently of main-menu/map navigation. Its host pauses/resumes the Phaser scene, restarts the current selection, or returns to MainMenu. Window/resize/key listeners and DOM hosts are cleaned up on scene shutdown. The generic examples below remain available for replacing these adapters with the final game model.
+
+## Public entry points and CSS
+
+The following paths assume a host file at this directory's root; adapt them relative to the host file in your game.
+
+| Use | Import | Stylesheet |
+|---|---|---|
+| Main menu with built-in map navigation | `createGameUI` from `./main menu/index.js` | `./main%20menu/game-ui.css` |
+| Main menu alone | `createMainMenu` from `./main menu/index.js` | `./main%20menu/main-menu.css` |
+| Map alone | `createMap` from `./map/index.js` | `./map/map.css` |
+| Gameplay pause window | `createPauseMenu` from `./pause menu/index.js` | `./pause%20menu/pause-menu.css` |
+| Route graph | `MAP_CONNECTIONS` from `./map/index.js` | No additional stylesheet |
+
+```html
+<link rel="stylesheet" href="./main%20menu/game-ui.css">
+<link rel="stylesheet" href="./pause%20menu/pause-menu.css">
+```
+
+`game-ui.css` imports both main-menu.css and map.css. JavaScript imports never load CSS automatically. The pause stylesheet is separate and is used during gameplay. No external font download is required.
+
+## Navigation and ownership
 
 ```text
-┌─────────────────────── Phaser game (src/main.ts) ───────────────────────┐
-│  MainMenuScene ──start('Combat', {moduleId, levelId})──► CombatScene    │
-│  DOM overlay: menu,                                      combat/view/   │
-│  map, modals                                                            │
-└────────┬──────────────────────────────────────────────────────┬─────────┘
-         │                                                      │  tick(dt), submit(answer)
-         ▼                                                      ▼  returns CombatEvent[]
-┌───────── Singletons ─────────┐                  ┌─────── CombatModel ────────┐
-│ SettingsStore → SoundManager │                  │ src/combat/ (no Phaser)    │
-│ MapProgressStore             │                  │ LevelSpec · ProblemSource  │
-│ src/state/ · src/audio/      │                  │ Enemy data · CombatEvent   │
-└──────────────────────────────┘                  └────────────────────────────┘
+Main Menu
+  New Game  -> host starts a session -> gameplay
+  Continue  -> host restores a save  -> gameplay
+  Settings  -> host settings screen  -> Main Menu
+  Quit Game -> host exit/launcher action
+  Map       -> three-classroom selection
+                 Classroom Level 1/2/3 -> that classroom's islands
+                 Main Menu            -> existing Main Menu
+                    Islands: Level 1..5 and Minigame 1..3
+                      Select -> host receives selection -> gameplay
+                      Back   -> three-classroom selection
 
-Minigames (src/minigames/): Make 24 (HTML) · Blacksmith (Konva)
-Math engine (src/Math/): ProblemGenerator · MathProblem · Enemy
+Gameplay
+  Pause -> host pauses model -> independent Pause Menu
+    Resume       -> host resumes model and hides pause window
+    Restart      -> host resets current level, resumes and hides window
+    Settings     -> host settings screen -> Pause Menu (model stays paused)
+    Quit to Menu -> host ends gameplay and shows existing Main Menu
 ```
 
-**Connections in place:**
-- The menu and map read settings and progress from the singleton stores (PR #26).
-- `CombatScene` drives `CombatModel` and animates the events it returns.
+Only the Map / Main Menu / classroom / Back UI routes are implemented internally. Every gameplay destination is a host callback. Keep the reusable menu/map instance when entering gameplay by hiding `ui.element`; restore it and call `showMap()` or `showMainMenu()` on return. `showMap()` opens the classroom screen. It does not directly open a particular classroom or island. Use `destroy()` when a UI is permanently unloaded.
 
-**Planned (next sprint):**
-- On victory, combat marks the level complete in `MapProgressStore` and returns to the map.
-- The map opens the minigames.
-- Minigame rewards (coins, defense, max HP) go into a shared player-stats store that combat reads.
-- Combat gets its problems from the math engine through a `ProblemSource` adapter.
+## Main menu interface
 
-**Design principles used across modules**
-- **Game logic is separate from rendering.** `CombatModel`, `BlacksmithModel` and Make 24's `logic.ts` contain no drawing code, so they can be unit tested without a browser.
-- **Modules talk through small typed interfaces**, e.g. `CombatEvent`, `LevelSpec`, `BlacksmithViewInterface`, `MathProblem`, and Make 24's `onSolve` / `onExit` callbacks.
-- **Randomness can be injected.** Models accept a random number generator, so tests are repeatable.
+Source: [types.ts](./main%20menu/types.ts), [main-menu.ts](./main%20menu/main-menu.ts).
 
----
+`createMainMenu(host: HTMLElement, options?: MainMenuOptions): MainMenuController`
 
-## Modules
+The component appends to the host without clearing its other children. The host width determines a 16:9 menu scene. By default it displays New Game, Continue, Settings, Quit Game and a separate Map icon/button.
 
-### 5.1 State management (`src/state/`)
+### Options and callbacks
 
-#### `settingsStore.ts` (`SettingsStore`)
-Centralized store for all user and audio preferences.
-- **Key responsibilities:**
-  - Manages `musicVolume` (0–100), `sfxVolume` (0–100), `muted` (boolean), and `difficulty` (`Easy` | `Normal` | `Hard`).
-  - Implements a reactive pub/sub listener pattern (`subscribe(listener)`) so audio and UI update immediately when settings change.
-  - Automatically synchronizes with browser `localStorage` (`team17_math_rpg_settings_v1`), with an in-memory fallback for non-browser and test environments.
-- **Key methods:**
-  - `getSettings()`: returns a copy of the current configuration.
-  - `setMusicVolume(val)` / `setSfxVolume(val)`: clamps input (0–100) and saves.
-  - `toggleMute()` / `setMuted(boolean)`: toggles or explicitly sets audio muting.
-  - `resetSettings()`: reverts settings to defaults.
+| `MainMenuOptions` field | Type and behavior |
+|---|---|
+| `title` | Optional heading string. |
+| `backgroundUrl` | Optional replacement for `assets/main-menu/classroom.png`. |
+| `mapIconUrl` | Optional replacement for `assets/icons/map.svg`. |
+| `characters` | `readonly MenuCharacter[]`; independent transparent foreground sprites. Defaults to the seven current characters; `[]` renders only the clean background. |
+| `labels` | `Partial<MenuLabels>`; override `newGame`, `continue`, `settings`, `quit`, `map`, `navigation`, `error`. |
+| `layout` | `Partial<MenuLayout>`; percentage values from 0 to 100, listed below. |
+| `theme` | `Partial<MenuTheme>`; colors/fonts listed below. |
+| `callbacks` | `MenuCallbacks`; optional handlers keyed by `newGame`, `continue`, `settings`, `quit`, `map`. |
+| `disabled` | `Partial<Record<MenuAction, boolean>>`; disable selected buttons. |
+| `onError` | `(error: unknown, context: MenuActionContext) => void`; host error reporting. |
 
-#### `mapProgressStore.ts` (`MapProgressStore`)
-Tracks level completion and unlock gating across classrooms (modules).
-- **Key responsibilities:**
-  - Defines the progression graph: Level 1 unlocks Levels 2 and 3; Level 3 opens the minigame branch; Boss Level 5 unlocks the next classroom.
-  - Persists completed and unlocked level IDs to `localStorage` (`team17_math_rpg_map_progress_v1`).
-  - Guards against invalid scene transitions via `attemptSelectLevel(moduleId, levelId)`.
-- **Key methods:**
-  - `isLevelUnlocked(moduleId, levelId)` / `isLevelCompleted(moduleId, levelId)`: progression checks used by the map UI.
-  - `isModuleUnlocked(moduleId)`: whether Classroom 1, 2 or 3 is accessible.
-  - `completeLevel(moduleId, levelId)`: marks a level complete, unlocks its targets, and saves.
-  - `resetProgress()`: resets progress to the initial state (only Module 1 Level 1 unlocked) when starting a new game.
+`MenuAction` is `'newGame' | 'continue' | 'settings' | 'quit' | 'map'`. `MENU_ACTIONS` exports that order. `MenuHandler` is `(context: MenuActionContext) => void | Promise<void>`. Each context contains:
 
-To reset progress by hand during testing, run `localStorage.removeItem('team17_math_rpg_map_progress_v1')` in the browser console.
+| Field | Meaning |
+|---|---|
+| `action` | Stable action key, independent of the visible label. |
+| `menu` | This `MainMenuController`. |
+| `signal` | `AbortSignal`; aborted when the menu is destroyed. Honor it after awaited work. |
 
-### 5.2 Procedural audio engine (`src/audio/`)
+The host implements the action destinations shown in the navigation diagram. Without a callback, a main-menu button does not navigate. Asynchronous callbacks lock all menu actions until settled. Errors are reported through `onError`, an accessible status and the bubbling `mainmenu:error` event with `{ error, action }` detail. An error thrown by `onError` produces another error event.
 
-> **Status:** in PR [#26](https://github.com/lottosson-code/Team-17/pull/26), not yet merged.
+`MenuLayout` fields and defaults are `titleTop: 21.5`, `panelTop: 42`, `panelLeft: 34`, `panelWidth: 32`, `mapTop: 31.5`, `mapLeft: 61.6`, `mapWidth: 8.1`. These are percentages of the full menu scene. Invalid values throw `RangeError` before applying the patch. Remaining geometry, including the panel's fixed height, is in [main-menu.css](./main%20menu/main-menu.css).
 
-#### `soundManager.ts` (`SoundManager`)
-A Web Audio API synthesizer that generates sound effects and music in real time, with no `.mp3` or `.wav` files.
-- **Key responsibilities:**
-  - **Autoplay handling:** registers passive listeners (`pointerdown`, `keydown`, `touchstart`) to unlock and resume a suspended browser `AudioContext`.
-  - **Volume routing:** routes music and sound effects through separate `GainNode` channels (`musicGainNode` and `sfxGainNode`).
-  - **Reactive volume control:** subscribes to `settingsStore` and recalculates gains smoothly, without audible pops.
-- **Audio synthesizers:**
-  - `playSfx(type)`: procedural sound effects built from waveform envelopes:
-    - `'hover'`: high-frequency sine with rapid exponential decay (button hover).
-    - `'click'`: two-tone triangle/sine chime (button clicks, checkboxes).
-    - `'start'`: three-note ascending RPG arpeggio (level launch).
-    - `'modalOpen'` / `'modalClose'`: ascending and descending pitch slides.
-  - `startMenuMusic()` / `stopMenuMusic()`: loops a calm pentatonic arpeggio using scheduled oscillators.
+`MenuTheme` fields are `titleColor`, `titleOutline`, `titleFont`, `bodyFont`, `panelColor`, `frameColor`, `buttonColor`, `buttonHoverColor`, `buttonTextColor`, `focusColor`.
 
-### 5.3 Scenes and game flow (`src/scenes/`)
+### Controller
 
-**On `main` today:** a placeholder flow, `MainMenu → WorldMap → LevelSelect → Combat`. `LevelSelectScene` starts combat with `scene.start('Combat', { moduleId, levelId })`. PR #26 replaces the menu, map and level-select scenes with the scenes below.
+| `MainMenuController` member | Behavior |
+|---|---|
+| `element` | Read-only reference to the root HTMLElement. |
+| `update(options)` | Merge a configuration patch; preserve omitted labels/callbacks/disabled values. |
+| `setCallbacks(callbacks)` | Replace every callback. Pass `{}` to disconnect them all. |
+| `setDisabled(action, disabled)` | Enable/disable one action. |
+| `setVisible(visible)` | Show/hide the UI; does not pause/resume a game model. |
+| `focus(action?)` | Focus the requested enabled action, defaulting to `continue`; fall back to the first enabled action. |
+| `destroy()` | Abort the pending action, remove listeners and this root; safe to repeat. |
 
-#### `MainMenuScene.ts` (PR #26)
-The entry Phaser scene, combining the canvas and DOM UI layers.
-- **Key responsibilities:**
-  - Mounts the combined DOM menu and map UI into a responsive overlay (`createSceneOverlay`).
-  - Connects menu actions:
-    - **New Game:** clears progress (`mapProgressStore.resetProgress()`) and opens the map.
-    - **Continue:** opens the map, keeping existing saves.
-    - **Settings / Quit:** open accessible DOM modals.
-  - Starts background music on create, and shuts down audio and UI cleanly on scene transitions.
-  - Accepts `{ showMap: true, roomIndex }` in `init()` to return players to their classroom map after a battle.
+## Independent foreground characters
 
-#### `CombatScene.ts`
-The combat scene is documented in [5.5](#55-combat--main-level-srccombat). PR #26 adds a bridge to the menu:
-- Receives `moduleId`, `levelId` and `activity` from the map.
-- Opens the in-game pause menu and settings without leaving the battle.
-- On victory, marks the level complete in `mapProgressStore` and returns to `MainMenuScene` with `{ showMap: true, roomIndex }`.
+Source: [characters.ts](./main%20menu/characters.ts). The empty background and seven figures are different PNG files. No creature is painted into the classroom plate.
 
-### 5.4 UI modals and helpers (`src/ui/`)
+`DEFAULT_MENU_CHARACTERS` is exported from the main-menu entry. Each `MenuCharacter` contains `id: string`, `imageUrl: string`, `x: number`, `y: number`, `width: number` and optional `idle: boolean`. Coordinates are percentages of the full 16:9 menu scene: x is horizontal center, y is the sprite's bottom/foot anchor, and width is image width. Change the default composition in characters.ts, or supply MainMenuOptions.characters. With createGameUI, supply the same data through options.menu.characters.
 
-> **Status:** in PR [#26](https://github.com/lottosson-code/Team-17/pull/26), not yet merged, except `components/createTextButton.ts`, which is on `main`.
+For a standalone main-menu controller, update({ characters: nextList }) replaces the character composition without changing buttons or callbacks. Pass characters: [] for the empty classroom alone. Character elements expose data-character-id; the host can target the image within that element for animation. Set idle: false when the model owns motion. The default small CSS idle motion honors prefers-reduced-motion. The decorative layer never intercepts clicks.
 
-- **`sceneOverlay.ts` (`createSceneOverlay`):** creates an overlay `div` positioned over the Phaser canvas, and resizes it to match Phaser's `FIT` scale mode so the DOM menu, map and modals line up with the game.
-- **`settingsModal.ts` (`createSettingsModal`):** an accessible modal in the DOM overlay with volume sliders, a mute toggle and difficulty radio buttons. It connects directly to `settingsStore` and plays sound effects through `soundManager`.
-- **`quitModal.ts` (`createQuitModal`):** a confirmation dialog before quitting. It supports Escape to dismiss and resolves a promise with the player's choice.
-- **`levelSelection.ts` (`toGameplaySelection`):** converts map selection events (`roomId`, `levelId`, `levelNumber`) into what `CombatScene` expects (`moduleId`, `levelId`, `activity`).
+All seven images use real transparent alpha. They are still sprites rather than frame-by-frame animation sheets, so a game can animate their position, scale or rotation independently.
 
-### 5.5 Combat / main level (`src/combat/`)
+## Combined main menu and map interface
 
-**What it does:** enemies walk down 4 lanes toward the wizard, each showing a math problem. Typing the answer and pressing Enter damages the enemy whose problem it solves. No two enemies on screen ever share an answer, so every answer has exactly one target. Enemies that reach the wizard attack until defeated, and the player loses at 0 HP. Levels follow a Plants vs. Zombies-style pattern: trickles of enemies, then waves (shown as skulls on the progress bar), then a finale that can play a boss cutscene. Levels 1-1 (addition under 100, with the boss turning + into ×) and 1-2 (times tables and ×0, with a 16-hit mini-boss) are playable.
+Source: [game-ui-types.ts](./main%20menu/game-ui-types.ts), [game-ui.ts](./main%20menu/game-ui.ts).
 
-**Structure**
+`createGameUI(host: HTMLElement, options?: GameUIOptions): GameUIController`
 
-| File | Responsibility |
-| --- | --- |
-| `CombatModel.ts` | All game rules, in plain TypeScript with no Phaser code. The scene calls `tick(dt)` every frame and `submit(answer)` on Enter. Both return a list of `CombatEvent`s (`hit`, `wrongAnswer`, `playerDamaged`, `won`…) that the scene animates. |
-| `types.ts` | Data shapes: `LevelSpec`, `SpawnGroup`, `EnemyKind`, `Enemy`, `CombatEvent`. |
-| `levels.ts` | Levels are data, so a new level is a new `LevelSpec` with no engine changes. `validateLevel` rejects mistakes. |
-| `problems.ts` | Problem sources with the signature `(liveAnswers, liveProblems) => problem`. Temporary, until combat uses the shared math engine. |
-| `laneLayout.ts` | 2.5D perspective math. Enemies store `progress` (0 = spawn, 1 = at the wizard); this file turns it into screen x / y / scale. |
-| `view/` | Phaser rendering only: `Battlefield` (room and lanes), `EnemySprite`, `WizardSprite`, `Effects`, `Hud`. `theme.ts` holds all art and layout values, so another module can reskin it. |
-| `src/scenes/CombatScene.ts` | Connects input, the model and the view: loads art, runs the model each frame, and plays cutscenes. |
+`GameUIOptions` has `menu?: MainMenuOptions` and `onLevelSelect?: (selection: LevelSelection) => void`. The combined UI reserves `menu.callbacks.map` for its internal navigation; a supplied Map handler is replaced. New Game, Continue, Settings and Quit handlers are forwarded to the host.
 
-**Using it**
+| `GameUIController` member | Behavior |
+|---|---|
+| `element` | Root containing the retained main menu and map. Hide this when showing gameplay elsewhere. |
+| `getState()` | Returns `GameUIState`: `{ scene: 'menu' | 'map', map: Readonly<MapState> }`. |
+| `showMainMenu()` | Show the existing main menu and focus its Map action. |
+| `showMap()` | Show the map's classroom screen and focus its first classroom. |
+| `destroy()` | Destroy both owned modules and their wrapper; safe to repeat. |
+
+The combined controller intentionally exposes neither its child controllers nor the pause window. Configure child menu callbacks at construction. Mount pause separately in the gameplay overlay.
+
+## Map interface and route planning
+
+Source: [types.ts](./map/types.ts), [layout.ts](./map/layout.ts), [map.ts](./map/map.ts).
+
+`createMap(host: HTMLElement, options?: MapOptions): MapController`
+
+`MapOptions` has two optional, synchronous callbacks:
+
+| Callback | When called and what the host does |
+|---|---|
+| `onLevelSelect(selection)` | After an island bounces and selection state changes. Pass the stable IDs to the game's loader and show gameplay. |
+| `onBackToMenu()` | When Main Menu is clicked on the classroom screen. Show the existing main menu. The combined controller wires this automatically. |
+
+The map does not await/catch callback results or lock asynchronous level loading. If the host loads a level asynchronously, it owns loading state, duplicate-entry prevention and error handling. Without a return callback, the classroom Main Menu button is hidden.
+
+`LevelSelection` contains these read-only fields:
 
 ```ts
-const model = new CombatModel(getLevel(1, 1));   // optional 2nd argument: a random number generator
-for (const event of model.tick(deltaMs)) { /* animate 'enemySpawned', 'playerDamaged', 'won', … */ }
-for (const event of model.submit(42))    { /* 'hit' / 'enemyDefeated', or 'wrongAnswer' */ }
+interface LevelSelection {
+  readonly roomId: string;
+  readonly levelId: string;
+  readonly levelNumber: number;
+  readonly selectionCount: number;
+}
 ```
 
-**Connecting to other modules:** start a level with `scene.start('Combat', { moduleId, levelId })`. On `won`, the scene should mark the level complete in the map progress store; this goes in once PR #26 merges.
+Room IDs are `classroom-01`, `classroom-02`, `classroom-03`. Each room has node indices 1 through 8. `levelId` is `<roomId>-level-<two-digit index>`, for example `classroom-02-level-06`. `levelNumber` is the internal node index, so 6 means **Minigame 1**, not a displayed Level 6. `selectionCount` increases for every selection in this map instance.
 
-**Tests:** `npx vitest run src/Tests/CombatModel.test.ts src/Tests/problems.test.ts src/Tests/laneLayout.test.ts src/Tests/hudLogic.test.ts src/Tests/theme.test.ts` (74 tests, with a seeded random number generator). More detail is in PRs [#28](https://github.com/lottosson-code/Team-17/pull/28) and [#31](https://github.com/lottosson-code/Team-17/pull/31).
+Every classroom reuses this layout and these connections:
 
-### 5.6 Math engine and Enemy (`src/Math/`, `src/MainLevel/`)
+```text
+Level 1 -> Level 2 -> Level 3 -> Level 4 -> Level 5
+                        |
+                        v
+                   Minigame 1 -> Minigame 2 -> Minigame 3
+```
 
-| File | Responsibility |
-| --- | --- |
-| `Math/ProblemGenerator.ts` | Generates a `MathProblem`. The constructor takes a `ProblemType`: `"addition"`, `"subtraction"`, `"multiplication"` or `"division"`. Subtraction answers are never negative and division answers are whole numbers. |
-| `Math/MathProblem.ts` | Interface for generated problems: `first_operand`, `second_operand`, `result` and `operator`. It makes clear what an Enemy holds, reduces coupling, and makes it easy to turn a problem into a string. |
-| `MainLevel/Enemy.ts` | Stores the state of one enemy unit, with helper functions to check that state. Most importantly, it holds a `MathProblem` generated by `ProblemGenerator`. |
+The upper five islands occupy approximately the upper two-thirds of the scene; the lower three form the branch. `MAP_CONNECTIONS` is exported as `MapConnection[]`, where `MapConnection` has read-only `fromLevel: number` and `toLevel: number`. Its edges are `(1,2), (2,3), (3,4), (4,5), (3,6), (6,7), (7,8)`.
 
-**Tests:**
-- `src/Tests/ProblemGenerator.test.ts` tests the constructor for every `ProblemType`, that answers are unique, and the `remove` / `reset` functions.
-- `src/Tests/Enemy.test.ts` checks that an Enemy's fields are initialized as expected (some random, some fixed) and that its functions behave correctly.
-- Run them with `npm test`.
+These edges define decorative bridge connections and data the host may later use for travel/unlock rules. The current UI allows **all eight islands** to be selected; it does not implement prerequisites, movement, progress persistence or unlock enforcement. Classroom labels and submap titles are placeholders. Every classroom resets the displayed Level and Minigame numbering.
 
-### 5.7 Blacksmith minigame (`src/minigames/blacksmith/`)
+`MapState` has read-only `view: 'rooms' | 'islands'`, `roomId: string | null`, `selectedLevelId: string | null`, and `selectionCount: number`.
 
-**Overview:** players solve systems of addition equations to upgrade their character's Defense and Max HP. Each item on the chalkboard ([Feather], [Potion], [Ingot]) stands for a hidden positive whole number. Players can switch between easy (2 variables), medium (3 variables) and hard (3 variables with larger sums), and play as many rounds as they like for stat upgrades.
+| `MapController` member | Behavior |
+|---|---|
+| `element` | Root map HTMLElement. Host width determines the 16:9 scene. |
+| `getState()` | Return a copy of current state. Mutating the copy does not update the map. |
+| `showRooms()` | Return to classroom selection; does not clear the recorded selected level/count. |
+| `focus()` | Focus the first current classroom/island button after the host makes the map visible. |
+| `destroy()` | Cancel animations, detach handlers and remove this map; safe to repeat. |
 
-| File | Responsibility |
-| --- | --- |
-| `BlacksmithModel.ts` | Minigame state, difficulty rules and player stats (`defense`, `maxHitpoints`). It picks whole-number values for each item first and builds the equations from them, so every puzzle has a whole-number solution. It also validates guesses and calculates rewards. |
-| `BlacksmithView.ts` | Draws the UI with Konva (`Konva.Group`, `Konva.Rect`, `Konva.Text`): chalkboard equations, player stats, difficulty buttons, and clickable answer boxes the player types into. |
-| `BlacksmithController.ts` | Connects the view and the model. It listens for user actions (switching difficulty, typing guesses, clicking Forge Armor, returning to the map), updates the model and refreshes the view. |
+The Back button and Escape in a submap return to classrooms. Map coordinates, sprite indices, island hit polygons and route data are in `map/layout.ts`; labels are in `map/labels.ts`. Main-route islands use sprite indices 0..4; Minigames reuse 0..2. Island presses also update the root's `data-selected-level-id` and each button's `data-selected`, `data-activation-count` and `aria-pressed` attributes. Empty sky above an island is not a hit target.
 
-**Rule:** business logic stays inside `BlacksmithModel.ts`, and the view only draws and reports input.
+## Pause menu interface
 
-**Tests:**
-- `BlacksmithModel.test.ts` covers 2- and 3-variable puzzle generation, switching difficulty, how rewards scale, generating a new puzzle every round, and invalid or incomplete input.
-- `BlacksmithController.test.ts` uses a mock view to check that typing numbers, non-numeric text, changing difficulty, and submitting right or wrong answers update the model and view correctly.
-- Run them with `npx vitest run src/minigames/blacksmith`.
+Source: [types.ts](./pause%20menu/types.ts), [pause-menu.ts](./pause%20menu/pause-menu.ts), [pause-menu.css](./pause%20menu/pause-menu.css).
 
-### 5.8 Make 24 minigame (`src/minigames/make24/`)
+`createPauseMenu(host: HTMLElement, options?: PauseMenuOptions): PauseMenuController`
 
-**Overview:** players combine four numbers with +, −, × and ÷ to make exactly 24 and earn coins. They tap a number card, an operation, then a second card; the two cards merge into one, and the player continues until one card is left. Every puzzle is guaranteed to be solvable.
-- **Difficulties:** easy (numbers 1–9, always solvable with whole numbers), normal (1–10) and hard (1–13, may need fractions). Players can play as many rounds as they like.
-- **Coins per solve:** 5 on easy, 10 on normal, 15 on hard.
-- The game also tracks puzzles solved, a streak and a timer.
+Mount this independently during gameplay. Give its host `position: relative`, `absolute` or `fixed`, plus a definite width and height. The transparent overlay fills that positioned area; it has no scene background or dimming layer. Mount once with `visible: false`; pause the model before calling `setVisible(true)`.
 
-See the module's own [README](src/minigames/make24/README.md) for the embedding API.
+| `PauseMenuOptions` field | Type and behavior |
+|---|---|
+| `title` | Optional window heading. |
+| `labels` | `Partial<PauseLabels>`; override `resume`, `restart`, `settings`, `quit`, `navigation`, `error`. |
+| `theme` | `Partial<PauseTheme>`; menu colors/fonts, listed below. |
+| `callbacks` | `PauseCallbacks`; optional handlers keyed by `resume`, `restart`, `settings`, `quit`. |
+| `disabled` | `Partial<Record<PauseAction, boolean>>`. |
+| `visible` | Initial/patched visibility; defaults to `true`. |
+| `onError` | `(error: unknown, context: PauseActionContext) => void`. |
 
-| File | Responsibility |
-| --- | --- |
-| `src/logic.ts` | Game logic with no UI code. `Fraction` does exact arithmetic, so 8 ÷ 3 stays exactly 8/3. `findSolution` tries every pair of numbers with every operation until one value is left, preferring whole-number solutions. `generatePuzzle` keeps rolling four numbers in the difficulty's range until the solver finds an answer. |
-| `src/make24.ts` | Draws the UI with HTML and connects it to the logic. `mountMake24` shows the cards, operation buttons, step log, coin and stat counters, difficulty buttons, Undo / Reset / New puzzle, and the win screen. It handles clicks and keyboard shortcuts, keeps an undo history, and reports results through callbacks: `onSolve` (coins earned), `onSkip`, and `onExit` (return to the map). |
-| `src/make24.css` | Styles that match the main menu. Every class starts with `cse-make24`, so nothing clashes with other screens, and the 16:9 scene scales with the window. |
-| `fonts/` | Lora and Poppins, bundled so the game works offline. |
-| `make24-demo.html` | A self-contained demo you can open by double-clicking, without running the project. |
+`PauseAction` is `'resume' | 'restart' | 'settings' | 'quit'`; `PAUSE_ACTIONS` exports that order. `PauseHandler` is `(context: PauseActionContext) => void | Promise<void>`. Context fields are `{ action, menu, signal }`, following the main-menu convention, but `menu` is a `PauseMenuController`. `destroy()` aborts the signal; hiding alone does not abort it.
 
-**Tests:**
-- `src/Tests/make24/make24Logic.test.ts` covers exact fraction math and the solver, including puzzles that need fractions, unsolvable hands like 1 1 1 1, and the known count of 1362 solvable hands out of 1820. It also covers expression formatting and puzzle generation for all three difficulties, with a seeded random number generator.
-- `src/Tests/make24/make24Component.test.ts` mounts the game in jsdom and clicks through it like a player. It covers combining cards, fractions and negative numbers, dividing by zero, undo and reset, wrong final answers, solving puzzles, coin rewards for each difficulty, skipping puzzles, and the Map button.
-- Run them with `npx vitest run src/Tests/make24`.
+`PauseCallbacks` responsibilities are: `resume` resumes the current model and hides the window; `restart` resets the current level before resuming/hiding; `settings` opens host settings while gameplay stays paused and returns to the pause window on close; `quit` ends gameplay and restores the host's existing main menu. The key remains `quit` even though its visible label is Quit to Menu. The host owns any confirmation prompts.
 
----
+`PauseTheme` reuses these `MenuTheme` fields: `titleColor`, `titleFont`, `bodyFont`, `panelColor`, `frameColor`, `buttonColor`, `buttonHoverColor`, `buttonTextColor`, `focusColor`. Here `panelColor` colors the blackboard. Neither theme nor options contain geometry fields.
 
-## Testing
+| `PauseMenuController` member | Behavior |
+|---|---|
+| `element` | Transparent overlay root. |
+| `update(options)` | Merge configuration, optionally including visibility. |
+| `setCallbacks(callbacks)` | Replace all handlers; `{}` disconnects them. |
+| `setDisabled(action, disabled)` | Enable/disable one action. |
+| `setVisible(visible)` | Show/hide UI only; opening focuses Resume and closing returns focus when still owned by the dialog. |
+| `focus(action?)` | Default to `resume`; fall back to the first enabled action. |
+| `getState()` | Copy of `PauseState`: `{ visible: boolean, busy: boolean, lastAction: PauseAction | null, activationCount: number }`. |
+| `destroy()` | Abort work, cancel animation, restore focus and remove this window; safe to repeat. |
 
-All tests use **Vitest** and run with `npm test`. CI ([`.github/workflows/test.yml`](.github/workflows/test.yml)) runs `npm ci`, `npm test` and `npm run build` on every push and pull request, so nothing merges with failing tests or type errors.
+Unconnected pause buttons bounce and record their action without navigation. `lastAction` is also exposed as `element.dataset.lastAction`. A connected asynchronous handler locks all four actions until settled. Rejections unlock controls, update an accessible status and emit `pausemenu:error` with `{ error, action }`; use `onError` for visible host error handling. A throwing error reporter is contained. Do not resume or replace the gameplay model while a restart/quit action is pending; destroy the controller when leaving the scene.
 
-| Module | Test files | Tests on `main` |
-| --- | --- | --- |
-| Combat | `CombatModel`, `problems`, `laneLayout`, `hudLogic`, `theme` | 74 |
-| Make 24 | `make24Logic`, `make24Component` | 62 |
-| Blacksmith | `BlacksmithModel`, `BlacksmithController` | 14 |
-| Math engine and Enemy | `ProblemGenerator`, `Enemy` | 14 |
-| Menu, settings, audio, progress | `settingsStore`, `soundManager`, `mapProgressStore`, `MainMenuScene`, `settingsModal`, `quitModal` | in PR #26 |
+The window supports Tab/Shift+Tab, arrow keys, Home/End, native Enter/Space activation, and Escape requesting Resume. Repeated Escape keydown events are consumed without requesting Resume again; the host's Escape opener must also ignore event.repeat, as CombatScene does. Events are handled inside this root, not by a document listener. The host must suspend gameplay keyboard handlers while paused and stop the opening Escape event from also closing the window. Use one active pause dialog. Reduced-motion preferences disable its bounce animation.
 
-**Testing conventions**
-- Test the logic, not the drawing: rules live in models with no rendering code, and views stay thin.
-- Inject randomness: pass a seeded random number generator so runs repeat exactly.
-- Mock outside dependencies: e.g. a mock `AudioContext` for the sound manager, a mock view for the Blacksmith controller, and jsdom for DOM components.
-- Cover the successful path, the failure path (wrong answers, invalid data) and edge cases (empty input, divide by zero, no unique answer left).
+### Pause size and position
 
-Rendering code (Phaser and Konva views) is checked by playtesting with `npm run dev`.
+| Responsibility | Where to configure it |
+|---|---|
+| Covered game area | Size/position of the HTMLElement passed as `host`. |
+| Alignment, spacing and stacking | `.cse-pause-menu` in pause-menu.css: `inset: 0`, `place-items: center`, `padding: 44px 16px 20px`, `z-index: 10`. Centering is inside the padded area. |
+| Visible board dimensions | `.cse-pause-menu__board`: `width: min(430px, 90cqw, calc(100cqh * .79))`, `aspect-ratio: 430 / 544`. Maximum framed rectangle is 430 by 544 pixels; straps/shadow extend outside it. |
+| Internal title/buttons | Their own percentage positions and board-relative `cqw` values in the same stylesheet. |
 
----
+For the board width calculation, `cqw`/`cqh` reference the overlay's content size. Changing the aspect ratio also requires updating the `.79` width/height limit. Load scoped overrides after the component CSS. Example: a maximum 360px board placed 80px below and 64px right of the host's top-left:
 
-## Contributing
+```css
+#game-overlay > .cse-pause-menu {
+  place-items: start;
+  padding: 80px 0 0 64px;
+}
+#game-overlay > .cse-pause-menu .cse-pause-menu__board {
+  width: min(360px, 90cqw, calc(100cqh * .79));
+}
+```
 
-1. **Branch** from `main` with a descriptive name: `feature/<area>` (e.g. `feature/combat-core`, `feature/blacksmith-minigame`) or `docs/<topic>`.
-2. **Commit** in small, focused steps. Messages say what changed and why, e.g. `Combat (Charles): Implemented level 1-2 … Added tests.`
-3. **Open a pull request into `main`.** Keep each PR to about one user story. The description should cover what the feature does, how to try it and run its tests, and notable design decisions (a PR template is being added to make this consistent).
-4. **Review:** at least one teammate tries the branch, reviews the code and approves before merging. CI must pass.
-5. **Ask first:** talk to a module's owner (see below) before changing their code, and agree on interfaces between modules before building on them.
-6. **Link** the PR to its user story in Issues, and close the issue once the PR merges.
+## Host integration examples
 
-**Code conventions:** TypeScript strict mode; keep game logic free of rendering code; prefix CSS classes by module (e.g. `cse-make24-`); keep art in `public/assets/` (WebP, made with the scripts in `scripts/`).
+These examples are application-side adapters for your real game model. The names in the model interfaces are suggestions to implement or adapt; the UI does not provide those model methods. Render gameplay outside the menu/map UI root.
 
----
+### Menu/map entry and gameplay return routes
 
-## Team and ownership
+```ts
+import { createGameUI } from './main menu/index.js';
+import type { LevelSelection } from './map/index.js';
 
-| Area | Owner |
-| --- | --- |
-| Combat / main level, battlefield art and HUD | Charles |
-| Math engine, Enemy, CI workflow | Alex |
-| Main menu, settings, audio, progress tracking | Ryan |
-| Menu, map and pause-menu UI | Jincheng |
-| Blacksmith minigame | Dominic |
-| Make 24 minigame | Laressa |
+interface GameReturnRoutes {
+  onReturnToMap(): void;
+  onReturnToMenu(): void;
+}
+interface MenuGameModel {
+  startNewGame(routes: GameReturnRoutes): void | Promise<void>;
+  resumeSavedGame(routes: GameReturnRoutes): void | Promise<void>;
+  openSettings(): void | Promise<void>;
+  quitGame(): void | Promise<void>;
+  openLevel(selection: LevelSelection, routes: GameReturnRoutes): void;
+}
 
----
+export function mountMenuAndMap(host: HTMLElement, model: MenuGameModel) {
+  const routes: GameReturnRoutes = {
+    onReturnToMap() { ui.element.hidden = false; ui.showMap(); },
+    onReturnToMenu() { ui.element.hidden = false; ui.showMainMenu(); },
+  };
+  const ui = createGameUI(host, {
+    menu: {
+      callbacks: {
+        newGame: async () => {
+          await model.startNewGame(routes);
+          ui.element.hidden = true;
+        },
+        continue: async () => {
+          await model.resumeSavedGame(routes);
+          ui.element.hidden = true;
+        },
+        settings: () => model.openSettings(),
+        quit: () => model.quitGame(),
+      },
+    },
+    onLevelSelect(selection) {
+      // openLevel owns loading state and errors, as MapOptions is synchronous.
+      model.openLevel(selection, routes);
+      ui.element.hidden = true;
+    },
+  });
+  return ui;
+}
+```
 
-## Known issues and next steps
+Give destination gameplay its `routes`. Its Return to Map / Return to Menu controls call those functions. For a standalone menu/map, import the corresponding factory and supply its callbacks directly using the same contracts above.
 
-- **Integration:** connect combat victories to `MapProgressStore`, the map to the minigames, and minigame rewards to a shared player-stats store that combat reads.
-- **Math engine:** move combat's problem generation (`src/combat/problems.ts`) onto the shared math engine.
-- **Rendering:** decide how the Konva (Blacksmith) and HTML (Make 24, menus) screens sit alongside the Phaser canvas.
-- **Blacksmith:** decide the scope of unlimited play, and whether upgrades need a cost or cap.
-- **Make 24:** make the difficulty setting change the puzzles noticeably, and add a tutorial.
-- **Balance:** playtest difficulty and pacing with younger students.
+### Independent gameplay pause adapter
+
+```ts
+import { createPauseMenu } from './pause menu/index.js';
+
+interface PauseGameModel {
+  pause(): void;
+  resume(): void;
+  restartCurrentLevel(signal: AbortSignal): void | Promise<void>;
+  openSettings(signal: AbortSignal): Promise<void>;
+  quitToMenu(signal: AbortSignal): void | Promise<void>;
+}
+
+export function mountPauseWindow(overlayHost: HTMLElement, model: PauseGameModel) {
+  const pause = createPauseMenu(overlayHost, {
+    visible: false,
+    callbacks: {
+      resume: ({ menu }) => {
+        model.resume();
+        menu.setVisible(false);
+      },
+      restart: async ({ menu, signal }) => {
+        await model.restartCurrentLevel(signal);
+        if (signal.aborted) return;
+        model.resume();
+        menu.setVisible(false);
+      },
+      settings: async ({ menu, signal }) => {
+        menu.setVisible(false);
+        try { await model.openSettings(signal); }
+        finally { if (!signal.aborted) menu.setVisible(true); }
+      },
+      quit: async ({ menu, signal }) => {
+        // Host implementation ends gameplay and restores the existing menu.
+        await model.quitToMenu(signal);
+        if (!signal.aborted) menu.setVisible(false);
+      },
+    },
+  });
+  return {
+    menu: pause,
+    open() { model.pause(); pause.setVisible(true); },
+    destroy() { pause.destroy(); },
+  };
+}
+```
+
+Create a positioned overlay inside the sized gameplay area:
+
+```html
+<div id="game">
+  <!-- The game's canvas or rendered gameplay belongs here. -->
+  <div id="game-overlay"></div>
+</div>
+```
+
+```css
+#game { position: relative; width: 100%; aspect-ratio: 16 / 9; }
+#game-overlay { position: absolute; inset: 0; pointer-events: none; }
+#game-overlay > .cse-pause-menu { pointer-events: auto; }
+```
+
+Pass `#game-overlay` to `mountPauseWindow`, connect its `open()` to the game's Pause action, and call `destroy()` when gameplay unloads. The empty host uses `pointer-events: none` so it does not intercept canvas input while the pause window is hidden; the visible pause root explicitly re-enables pointer events. For pause Quit to Menu, the host can restore the retained combined UI with `ui.element.hidden = false; ui.showMainMenu()` after ending gameplay.
+
+## Asset inventory and exact consumers
+
+The repository has one shared root assets/ directory. It contains only the current selected artwork and its static URL registry; superseded module-local image copies and the old composite monster background have been removed from this project.
+
+| File | Dimensions | Content | Runtime consumer |
+|---|---|---|---|
+| [assets/main-menu/classroom.png](./assets/main-menu/classroom.png) | 1672 x 941 | Empty night classroom, with no monsters. | assets/index.ts -> main-menu.ts background |
+| [assets/icons/map.svg](./assets/icons/map.svg) | SVG viewBox 100 x 72 | Folded-map icon. | assets/index.ts -> main-menu.ts Map button |
+| [assets/map/classrooms.png](./assets/map/classrooms.png) | 1672 x 941 | Three-classroom selection scene. | assets/index.ts -> map.ts showRooms() |
+| [assets/map/dream.png](./assets/map/dream.png) | 1672 x 941 | Floating-island background. | assets/index.ts -> map.ts showIslands() |
+| [assets/map/islands.png](./assets/map/islands.png) | 1959 x 803 | Five-island horizontal atlas; branch reuses sprites 0..2. | map.css background URL; layout.ts sprite selection |
+| [assets/map/bridge.png](./assets/map/bridge.png) | 2172 x 724 | Transparent bridge reused by all seven graph edges. | assets/index.ts -> map.ts appendBridges() |
+| [assets/characters/charcoal-book.png](./assets/characters/charcoal-book.png) | 1247 x 1261 | Charcoal book with worn gold trim and suspicious eyes. | characters.ts -> character id charcoal-book |
+| [assets/characters/small-eraser.png](./assets/characters/small-eraser.png) | 1212 x 1297 | Small nervous dirty-ivory eraser. | characters.ts -> character id small-eraser |
+| [assets/characters/pencil.png](./assets/characters/pencil.png) | 1174 x 1339 | Worn ochre pencil with red eraser and sly grin. | characters.ts -> character id pencil |
+| [assets/characters/triangle-ruler.png](./assets/characters/triangle-ruler.png) | 1225 x 1284 | Grumpy triangular set-square ruler. | characters.ts -> character id triangle-ruler |
+| [assets/characters/red-book.png](./assets/characters/red-book.png) | 1287 x 1222 | Red book with skeptical eyes and worn gold trim. | characters.ts -> character id red-book |
+| [assets/characters/pencil-sharpener.png](./assets/characters/pencil-sharpener.png) | 1351 x 1164 | Dark steel sharpener with blade channel and screw. | characters.ts -> character id pencil-sharpener |
+| [assets/characters/large-eraser.png](./assets/characters/large-eraser.png) | 1320 x 1192 | Larger anxious seated dirty-ivory eraser. | characters.ts -> character id large-eraser |
+
+The seven character PNGs have transparent backgrounds and can be loaded independently of the classroom. The background plate is opaque and has no monsters. The pause blackboard/frame/straps/chalk/eraser are drawn in pause-menu.css and need no image file.
+
+All TypeScript artwork URLs are explicit static new URL literals in assets/index.ts, allowing Vite to emit them. The island atlas CSS URL is relative to map.css and points to ../assets/map/islands.png. The actual startup imports the UI styles and mounts the modules, so the application build now includes these assets. For standalone deployment, run build:ui and serve dist/ui/, which already contains assets/ beside main menu/, map/ and pause menu/.
+
+If replacing an atlas or rearranging room art, update sprite positions, classroom hit areas and island polygons with it. Do not introduce another module-local assets copy.
+
+## Editing guide and design constraints
+
+| Change | Edit |
+|---|---|
+| Main-menu title/button text | `defaultTitle` / `defaultLabels` in main-menu.ts, or options overrides. |
+| Map titles, Level and Minigame labels | map/labels.ts. |
+| Pause title/button labels | pause menu/labels.ts, or options overrides. |
+| Main-menu position and colors | MainMenuOptions.layout/theme and main-menu.css. |
+| Character images, positions and motion | Root assets/characters/, assets/index.ts and main menu/characters.ts; MainMenuOptions.characters overrides. |
+| Map coordinates, hit polygons, sprite choices, routes | map/layout.ts; classroom hit areas and visual styling in map.css. |
+| Pause size, location, spacing and colors | Annotated pause-menu.css; theme overrides for colors/fonts. |
+| Game destinations and gameplay loading | The host adapters and game model, not the artwork/UI components. |
+
+Keep implementation comments and documentation in English. Retain `placeholder：` comments at temporary product text definitions. Use the existing restrained classroom/night palette, essential functional text and no extra small explanatory captions. Buttons have no default outline; keyboard focus remains visible. Preserve actual object hit areas and reduced-motion behavior.
+
+The route graph is implemented as visual/data layout, while unlock/progression logic remains host work. Classroom candle brightening on hover is a future artwork/layering enhancement and is not implemented. These UI modules do not implement the game model; the existing application remains in src/.

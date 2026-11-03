@@ -10,6 +10,7 @@ import { laneDanger, lowHealthLevel } from '../combat/view/hudLogic';
 import { createTextures } from '../combat/view/textures';
 import { CURSED_CLASSROOM, DEPTH, enemyArt, themeTextures, wizardFeet } from '../combat/view/theme';
 import { WizardSprite } from '../combat/view/WizardSprite';
+import { mapProgressStore } from '../state/mapProgressStore';
 
 // This scene only draws state and reacts to events.
 
@@ -41,9 +42,9 @@ export class CombatScene extends Phaser.Scene {
     super('Combat');
   }
 
-  init(data: { moduleId: number; levelId: number }): void {
-    this.moduleId = data.moduleId;
-    this.levelId = data.levelId;
+  init(data: { moduleId?: number; levelId?: number }): void {
+    this.moduleId = data?.moduleId ?? 1;
+    this.levelId = data?.levelId ?? 1;
     this.enemySprites = new Map();
     this.typed = '';
     this.wavesStarted = 0;
@@ -202,6 +203,7 @@ export class CombatScene extends Phaser.Scene {
           this.enemySprites.get(event.enemyId)?.popProblem();
           break;
         case 'won':
+          mapProgressStore.completeLevel(this.moduleId, this.levelId);
           this.hud.showOverlay('won');
           break;
         case 'lost':
@@ -223,8 +225,6 @@ export class CombatScene extends Phaser.Scene {
     this.effects.impact(target);
     this.effects.correct(target);
     this.effects.damage(target, damage);
-    this.effects.shake(0.003, 80);
-    sprite.hit();
   }
 
   private defeatEnemy(enemyId: number): void {
