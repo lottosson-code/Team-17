@@ -43,6 +43,7 @@ export class CombatModel {
     private memberIndex = 0; // Members of the current entry spawned, when it is a list
     private spawnTimerMs = 0;
     private activeCutscene: CutsceneSpec | undefined;
+    private walkInDone = false;
 
     /** Events produced outside tick/submit, delivered on the next tick. */
     private pending: CombatEvent[] = [];
@@ -61,7 +62,11 @@ export class CombatModel {
     public tick(dtMs: number): CombatEvent[] {
         const events = this.pending;
         this.pending = [];
-        if (this.isOver() || this.status === 'cutscene' || dtMs <= 0) return events;
+        if (this.isOver() || dtMs <= 0) return events;
+        if (this.status === 'cutscene') {
+            this.walkIn(dtMs, events);
+            return events;
+        }
 
         // Move existing enemies before spawning, so new ones start at progress 0.
         for (const enemy of this.enemies) {
@@ -237,7 +242,26 @@ export class CombatModel {
     private startCutscene(cutscene: CutsceneSpec, events: CombatEvent[]): void {
         this.activeCutscene = cutscene;
         this.status = 'cutscene';
+        this.walkInDone = cutscene.walkInTo === undefined;
         events.push({ type: 'cutsceneStarted', id: cutscene.id });
+    }
+
+    /**
+     * During a cutscene with `walkInTo`: enemies keep walking (they can't be attacked and don't
+     * attack) until all reach that progress, then 'cutsceneEnemiesReady' tells the scene to go on.
+     */
+    private walkIn(dtMs: number, events: CombatEvent[]): void {
+        const target = this.activeCutscene?.walkInTo;
+        if (this.walkInDone || target === undefined) return;
+        let arrived = true;
+        for (const enemy of this.enemies) {
+            enemy.progress = Math.min(target, enemy.progress + dtMs / enemy.kind.walkMs);
+            if (enemy.progress < target) arrived = false;
+        }
+        if (arrived) {
+            this.walkInDone = true;
+            events.push({ type: 'cutsceneEnemiesReady' });
+        }
     }
 
     /** A random lane whose spawn point is clear, or undefined if none is. */
@@ -349,6 +373,10 @@ function validateLevel(level: LevelSpec): void {
             throw new Error(`Group ${g}: delays and intervals cannot be negative`);
         }
         if (group.cutscene && group.type !== 'finale') throw new Error(`Group ${g}: only a 'finale' can have a cutscene`);
+        const walkInTo = group.cutscene?.walkInTo;
+        if (walkInTo !== undefined && !(walkInTo > 0 && walkInTo < 1)) {
+            throw new Error(`Group ${g}: walkInTo must be between 0 and 1`);
+        }
         for (const entry of group.enemies) {
             const kinds = asList(entry);
             if (kinds.length === 0 || kinds.length > LANE_COUNT) {

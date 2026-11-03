@@ -33,6 +33,9 @@ export interface CutsceneSpec {
     // 'afterSpawn' (default): plays once the group's enemies are on screen.
     // 'beforeSpawn': plays when the group starts; its enemies spawn once endCutscene() is called.
     when?: 'afterSpawn' | 'beforeSpawn';
+    // 'afterSpawn' only: the enemies first walk in to this progress (0-1) as part of the cutscene,
+    // untouchable, then 'cutsceneEnemiesReady' is sent and they stand still.
+    walkInTo?: number;
     twist?: {
         from: Operator;
         to: Operator; // Rewrites live problems, e.g. + into *
@@ -90,6 +93,7 @@ export type CombatEvent =
     | { type: 'enemySpawned'; enemyId: number }
     | { type: 'announcement'; text: string }
     | { type: 'cutsceneStarted'; id: string }
+    | { type: 'cutsceneEnemiesReady' } // A cutscene's walk-in has finished
     | { type: 'problemTwisted'; enemyId: number }
     | { type: 'cutsceneEnded'; id: string }
     | { type: 'hit'; enemyId: number; damage: number }
