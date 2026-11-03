@@ -65,6 +65,8 @@ export const MODULE1_LEVEL1: LevelSpec = {
             problems: createTwistableProblems('+', '*', 2, 9),
             cutscene: {
                 id: 'bossTwist',
+                // They walk in from off screen (untouchable), stop, then the boss appears.
+                walkInTo: 0.22,
                 twist: { from: '+', to: '*', problemsAfter: createMultiplicationProblems(2, 9) },
             },
         },

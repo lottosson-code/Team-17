@@ -157,6 +157,7 @@ describe('CombatModel', () => {
         expect(model.tick(16)).toContainEqual({ type: 'announcement', text: 'Here they come' });
     });
 
+
     test('an enemy kind with ownProblems gets a fresh source per enemy', () => {
         let created = 0;
         const model = create(level({
@@ -404,6 +405,43 @@ describe('CombatModel cutscenes', () => {
         expect(model.getStatus()).toBe('playing');
     });
 
+    test('with walkInTo, enemies walk in during the cutscene, untouchable, then stop and report ready', () => {
+        const model = create(level({
+            playerMaxHp: 100,
+            groups: [{
+                type: 'finale', enemies: ['grunt', 'tank', 'grunt'], startDelayMs: 0, intervalMs: 0,
+                cutscene: { id: 'bossTwist', walkInTo: 0.25 },
+            }],
+        }));
+        expect(types(model.tick(0))).toEqual(['enemySpawned', 'enemySpawned', 'enemySpawned', 'cutsceneStarted']);
+        // Separate lanes, so they never overlap.
+        expect(new Set(model.getEnemies().map(enemy => enemy.lane)).size).toBe(3);
+
+        // Walking in (walkMs is 1000, so 0.25 takes 250 ms); answers do nothing meanwhile.
+        expect(model.tick(100)).toEqual([]);
+        expect(model.getEnemies()[0].progress).toBeCloseTo(0.1);
+        expect(model.submit(model.getEnemies()[0].problem.answer)).toEqual([]);
+        expect(model.getStatus()).toBe('cutscene');
+
+        // Arrive together, report once, then stand still until the cutscene ends.
+        expect(model.tick(200)).toEqual([{ type: 'cutsceneEnemiesReady' }]);
+        expect(model.getEnemies().every(enemy => enemy.progress === 0.25)).toBe(true);
+        expect(model.tick(5000)).toEqual([]);
+        expect(model.getEnemies().every(enemy => enemy.progress === 0.25 && enemy.state === 'walking')).toBe(true);
+
+        model.endCutscene();
+        model.tick(100);
+        expect(model.getEnemies()[0].progress).toBeCloseTo(0.35);
+    });
+
+    test('walkInTo must be between 0 and 1', () => {
+        const finale = (walkInTo: number): SpawnGroup => ({
+            type: 'finale', enemies: ['grunt'], startDelayMs: 0, intervalMs: 0, cutscene: { id: 'x', walkInTo },
+        });
+        expect(() => create(level({ groups: [finale(0)] }))).toThrow(/walkInTo/);
+        expect(() => create(level({ groups: [finale(1)] }))).toThrow(/walkInTo/);
+    });
+
     test('twistOperators and endCutscene throw outside a cutscene', () => {
         const model = create(twistLevel());
         expect(() => model.twistOperators()).toThrow();
@@ -453,6 +491,17 @@ describe('MODULE1_LEVEL1', () => {
         expect(model.getEnemies()).toHaveLength(3);
         expect(model.getEnemies().every(enemy => enemy.problem.left <= 9 && enemy.problem.right <= 9)).toBe(true);
         expect(model.getProgress()).toBeCloseTo(20 / 23);
+
+        // The three come in from off screen, each in its own lane, and walk in before the boss appears.
+        const enemies = model.getEnemies();
+        expect(new Set(enemies.map(enemy => enemy.lane)).size).toBe(3);
+        expect(enemies.every(enemy => enemy.progress < 0.05)).toBe(true);
+        let ready = false;
+        for (let frame = 0; frame < 400 && !ready; frame++) {
+            ready = types(model.tick(50)).includes('cutsceneEnemiesReady');
+        }
+        expect(ready).toBe(true);
+        expect(enemies.every(enemy => enemy.progress === MODULE1_LEVEL1.groups[4].cutscene?.walkInTo)).toBe(true);
     });
 });
 
