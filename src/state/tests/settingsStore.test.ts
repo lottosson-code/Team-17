@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SettingsStore, SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS } from './settingsStore';
+import { SettingsStore, SETTINGS_STORAGE_KEY, DEFAULT_SETTINGS } from '../settingsStore';
 
 class MockStorage implements Storage {
   private data = new Map<string, string>();

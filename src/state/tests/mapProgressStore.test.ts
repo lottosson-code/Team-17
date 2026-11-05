@@ -3,7 +3,7 @@ import {
   MapProgressStore,
   MAP_PROGRESS_STORAGE_KEY,
   MODULE_THEMES,
-} from './mapProgressStore';
+} from '../mapProgressStore';
 
 class MockStorage implements Storage {
   private data = new Map<string, string>();

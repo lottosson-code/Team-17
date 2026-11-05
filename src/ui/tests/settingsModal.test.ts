@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { settingsStore } from '../state/settingsStore';
-import { soundManager } from '../audio/soundManager';
-import { createSettingsModal } from './settingsModal';
+import { settingsStore } from '../../state/settingsStore';
+import { soundManager } from '../../audio/soundManager';
+import { createSettingsModal } from '../settingsModal';
 
 interface MockElement {
   tagName: string;

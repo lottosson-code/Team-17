@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createQuitModal } from './quitModal';
+import { createQuitModal } from '../quitModal';
 
 interface MockElement {
   tagName: string;

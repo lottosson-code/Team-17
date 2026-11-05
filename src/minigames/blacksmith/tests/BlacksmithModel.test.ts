@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { BlacksmithModel } from './BlacksmithModel';
+import { BlacksmithModel } from '../BlacksmithModel';
 
 function fixedRandom(): number {
     return 0.5;
