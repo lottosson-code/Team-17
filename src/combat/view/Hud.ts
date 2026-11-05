@@ -263,8 +263,7 @@ export class Hud {
         const hint = kind === 'paused' ? 'Esc to resume' : 'R to restart  ·  M for menu';
         items.push(add.text(640, 470, hint, { fontFamily: 'Lora', fontSize: '16px', color: '#a99ccc' }).setOrigin(0.5));
 
-        this.overlay = add.container(0, 0, items).setDepth(DEPTH.overlay).setAlpha(0);
-        this.scene.tweens.add({ targets: this.overlay, alpha: 1, duration: 200 });
+        this.overlay = add.container(0, 0, items).setDepth(DEPTH.overlay).setAlpha(1);
     }
 
     private drawInputFrame(): void {
