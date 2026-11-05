@@ -59,7 +59,7 @@ describe('Make24Scene', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     playSfxSpy = vi.spyOn(soundManager, 'playSfx').mockImplementation(() => {});
-    completeLevelSpy = vi.spyOn(mapProgressStore, 'completeLevel').mockImplementation(() => {});
+    completeLevelSpy = vi.spyOn(mapProgressStore, 'completeLevel').mockReturnValue({ unlockedLevels: [], completedLevels: [] });
     scene = new Make24Scene();
     scene.init({ moduleId: 1, levelId: 6 });
   });

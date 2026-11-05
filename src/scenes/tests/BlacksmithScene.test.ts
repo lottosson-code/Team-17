@@ -95,7 +95,7 @@ describe('BlacksmithScene', () => {
     vi.clearAllMocks();
     capturedBlacksmithCallbacks = {};
     playSfxSpy = vi.spyOn(soundManager, 'playSfx').mockImplementation(() => {});
-    completeLevelSpy = vi.spyOn(mapProgressStore, 'completeLevel').mockImplementation(() => {});
+    completeLevelSpy = vi.spyOn(mapProgressStore, 'completeLevel').mockReturnValue({ unlockedLevels: [], completedLevels: [] });
     scene = new BlacksmithScene();
     scene.init({ moduleId: 1, levelId: 7 });
   });
