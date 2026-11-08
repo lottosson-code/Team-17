@@ -1,7 +1,8 @@
 /* DOM controls share the visible canvas bounds, including letterboxed windows. */
 .game-ui-host { position: absolute; z-index: 5; pointer-events: none; }
 .game-ui-host > .cse-game-ui,
-.game-ui-host > .cse-pause-menu { pointer-events: auto; }
+.game-ui-host > .cse-pause-menu,
+.game-ui-host > .cse-make24 { pointer-events: auto; }
 .game-pause-trigger {
   position: absolute; top: 20px; right: 20px; z-index: 6;
   padding: 10px 20px; border: 0; border-radius: 3px;

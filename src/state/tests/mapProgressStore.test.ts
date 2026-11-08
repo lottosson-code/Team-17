@@ -3,7 +3,7 @@ import {
   MapProgressStore,
   MAP_PROGRESS_STORAGE_KEY,
   MODULE_THEMES,
-} from './mapProgressStore';
+} from '../mapProgressStore';
 
 class MockStorage implements Storage {
   private data = new Map<string, string>();
@@ -70,29 +70,30 @@ describe('mapProgressStore', () => {
     expect(store.getTotalProgress()).toEqual({ completedCount: 0, totalCount: 15 });
   });
 
-  it('completing Level 1 unlocks BOTH Level 2 and Level 3 simultaneously', () => {
+  it('completing Level 1 unlocks Level 2 (and keeps Level 3 locked)', () => {
     const store = MapProgressStore.getInstance();
 
     store.completeLevel(1, 1);
 
     expect(store.isLevelCompleted(1, 1)).toBe(true);
     expect(store.isLevelUnlocked(1, 2)).toBe(true);
-    expect(store.isLevelUnlocked(1, 3)).toBe(true);
+    expect(store.isLevelUnlocked(1, 3)).toBe(false);
     expect(store.isLevelUnlocked(1, 4)).toBe(false);
   });
 
-  it('completing Level 2 unlocks Level 4 (convergence)', () => {
+  it('completing Level 2 unlocks Level 3', () => {
     const store = MapProgressStore.getInstance();
     store.completeLevel(1, 1);
     store.completeLevel(1, 2);
 
-    expect(store.isLevelUnlocked(1, 4)).toBe(true);
-    expect(store.isLevelUnlocked(1, 5)).toBe(false);
+    expect(store.isLevelUnlocked(1, 3)).toBe(true);
+    expect(store.isLevelUnlocked(1, 4)).toBe(false);
   });
 
   it('completing Level 3 unlocks Level 4 and minigame 1', () => {
     const store = MapProgressStore.getInstance();
     store.completeLevel(1, 1);
+    store.completeLevel(1, 2);
     store.completeLevel(1, 3);
 
     expect(store.isLevelUnlocked(1, 4)).toBe(true);
@@ -103,6 +104,7 @@ describe('mapProgressStore', () => {
     const store = MapProgressStore.getInstance();
     store.completeLevel(1, 1);
     store.completeLevel(1, 2);
+    store.completeLevel(1, 3);
     store.completeLevel(1, 4);
 
     expect(store.isLevelUnlocked(1, 5)).toBe(true);
@@ -161,7 +163,7 @@ describe('mapProgressStore', () => {
     const parsed = JSON.parse(stored!);
     expect(parsed.completedLevels).toContain('1-1');
     expect(parsed.unlockedLevels).toContain('1-2');
-    expect(parsed.unlockedLevels).toContain('1-3');
+    expect(parsed.unlockedLevels).not.toContain('1-3');
 
     // Reload from storage
     MapProgressStore.resetInstance();

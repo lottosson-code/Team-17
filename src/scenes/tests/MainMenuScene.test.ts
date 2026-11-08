@@ -55,7 +55,7 @@ let capturedGameUIOptions: {
 } = {};
 
 // Mock createGameUI
-vi.mock('../../main menu/index.js', () => ({
+vi.mock('../../../main menu/index.js', () => ({
   createGameUI: vi.fn((_element, options) => {
     capturedGameUIOptions = options;
     mockGameUIController = {
@@ -77,7 +77,7 @@ let mockHostElement: {
 
 let mockHostDestroy: ReturnType<typeof vi.fn>;
 
-vi.mock('../ui/sceneOverlay', () => ({
+vi.mock('../../ui/sceneOverlay', () => ({
   createSceneOverlay: vi.fn(() => {
     mockHostDestroy = vi.fn();
     mockHostElement = {
@@ -96,7 +96,7 @@ vi.mock('../ui/sceneOverlay', () => ({
 // Mock settingsModal & quitModal
 let mockSettingsModalDestroy: ReturnType<typeof vi.fn>;
 let capturedSettingsOptions: { onClose?: () => void } = {};
-vi.mock('../ui/settingsModal', () => ({
+vi.mock('../../ui/settingsModal', () => ({
   createSettingsModal: vi.fn((_host, options) => {
     capturedSettingsOptions = options;
     mockSettingsModalDestroy = vi.fn();
@@ -109,7 +109,7 @@ vi.mock('../ui/settingsModal', () => ({
 
 let mockQuitModalDestroy: ReturnType<typeof vi.fn>;
 let capturedQuitOptions: { onCancel?: () => void; onConfirm?: () => void } = {};
-vi.mock('../ui/quitModal', () => ({
+vi.mock('../../ui/quitModal', () => ({
   createQuitModal: vi.fn((_host, options) => {
     capturedQuitOptions = options;
     mockQuitModalDestroy = vi.fn();
@@ -120,9 +120,9 @@ vi.mock('../ui/quitModal', () => ({
   }),
 }));
 
-import { MainMenuScene } from './MainMenuScene';
-import { soundManager } from '../audio/soundManager';
-import { mapProgressStore } from '../state/mapProgressStore';
+import { MainMenuScene } from '../MainMenuScene';
+import { soundManager } from '../../audio/soundManager';
+import { mapProgressStore } from '../../state/mapProgressStore';
 
 describe('MainMenuScene', () => {
   let scene: MainMenuScene;
@@ -241,6 +241,48 @@ describe('MainMenuScene', () => {
       levelId: 1,
       activity: 'level',
       selectionId: 'classroom-01-level-01',
+    });
+  });
+
+  it('routes to Make24 minigame when level 6 is selected', () => {
+    scene.create();
+
+    const onLevelSelect = capturedGameUIOptions.onLevelSelect;
+    expect(onLevelSelect).toBeDefined();
+
+    onLevelSelect!({
+      roomId: 'classroom-01',
+      levelId: 'classroom-01-level-06',
+      levelNumber: 6,
+      selectionCount: 1,
+    });
+
+    expect(playSfxSpy).toHaveBeenCalledWith('start');
+    expect(stopMusicSpy).toHaveBeenCalledTimes(1);
+    expect(scene.scene.start).toHaveBeenCalledWith('Make24', {
+      moduleId: 1,
+      levelId: 6,
+    });
+  });
+
+  it('routes to Blacksmith minigame when level 7 is selected', () => {
+    scene.create();
+
+    const onLevelSelect = capturedGameUIOptions.onLevelSelect;
+    expect(onLevelSelect).toBeDefined();
+
+    onLevelSelect!({
+      roomId: 'classroom-01',
+      levelId: 'classroom-01-level-07',
+      levelNumber: 7,
+      selectionCount: 1,
+    });
+
+    expect(playSfxSpy).toHaveBeenCalledWith('start');
+    expect(stopMusicSpy).toHaveBeenCalledTimes(1);
+    expect(scene.scene.start).toHaveBeenCalledWith('Blacksmith', {
+      moduleId: 1,
+      levelId: 7,
     });
   });
 

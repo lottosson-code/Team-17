@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { settingsStore } from '../state/settingsStore';
-import { SoundManager, SfxType } from './soundManager';
+import { settingsStore } from '../../state/settingsStore';
+import { SoundManager, SfxType } from '../soundManager';
 
 class MockAudioNode {
   connect = vi.fn();

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { BlacksmithModel } from './BlacksmithModel';
-import { BlacksmithController } from './BlacksmithController';
-import { BlacksmithViewInterface } from './BlacksmithView';
+import { BlacksmithModel } from '../BlacksmithModel';
+import { BlacksmithController } from '../BlacksmithController';
+import { BlacksmithViewInterface } from '../BlacksmithView';
 
 function createMockView(): BlacksmithViewInterface {
     return {

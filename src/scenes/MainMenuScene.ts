@@ -101,7 +101,18 @@ export class MainMenuScene extends Phaser.Scene {
       onLevelSelect: (selection) => {
         soundManager.playSfx('start');
         soundManager.stopMenuMusic();
-        this.scene.start('Combat', toGameplaySelection(selection));
+        const gameplay = toGameplaySelection(selection);
+        if (gameplay.activity === 'minigame') {
+          if (gameplay.levelId === 1) {
+            this.scene.start('Make24', { moduleId: gameplay.moduleId, levelId: 6 });
+            return;
+          }
+          if (gameplay.levelId === 2) {
+            this.scene.start('Blacksmith', { moduleId: gameplay.moduleId, levelId: 7 });
+            return;
+          }
+        }
+        this.scene.start('Combat', gameplay);
       },
     });
 

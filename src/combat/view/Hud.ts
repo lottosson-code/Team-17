@@ -254,17 +254,16 @@ export class Hud {
             fontFamily: 'Lora', fontSize: '54px', fontStyle: 'bold', color: colors[kind], stroke: '#140818', strokeThickness: 8,
         }).setOrigin(0.5);
         const buttons = kind === 'paused'
-            ? [['Resume', () => this.callbacks.onPause()], ['Restart', () => this.callbacks.onRestart()], ['Main Menu', () => this.callbacks.onMenu()]] as const
-            : [['Play Again', () => this.callbacks.onRestart()], ['Main Menu', () => this.callbacks.onMenu()]] as const;
-        const spacing = 176;
+            ? [['Resume', () => this.callbacks.onPause()], ['Restart', () => this.callbacks.onRestart()], ['Back to Map', () => this.callbacks.onMenu()]] as const
+            : [['Play Again', () => this.callbacks.onRestart()], ['Back to Map', () => this.callbacks.onMenu()]] as const;
+        const spacing = 190;
         const first = 640 - ((buttons.length - 1) * spacing) / 2;
         const items: Phaser.GameObjects.GameObject[] = [dim, box, title];
         buttons.forEach(([label, action], i) => items.push(menuButton(this.scene, first + i * spacing, 410, label, action)));
-        const hint = kind === 'paused' ? 'Esc to resume' : 'R to restart  ·  M for menu';
+        const hint = kind === 'paused' ? 'Esc to resume' : 'R to restart  ·  M for map';
         items.push(add.text(640, 470, hint, { fontFamily: 'Lora', fontSize: '16px', color: '#a99ccc' }).setOrigin(0.5));
 
-        this.overlay = add.container(0, 0, items).setDepth(DEPTH.overlay).setAlpha(0);
-        this.scene.tweens.add({ targets: this.overlay, alpha: 1, duration: 200 });
+        this.overlay = add.container(0, 0, items).setDepth(DEPTH.overlay).setAlpha(1);
     }
 
     private drawInputFrame(): void {
@@ -327,11 +326,12 @@ function pressable(target: Phaser.GameObjects.Container, action: () => void): vo
 }
 
 function menuButton(scene: Phaser.Scene, x: number, y: number, label: string, action: () => void): Phaser.GameObjects.Container {
-    const bg = scene.add.graphics();
-    bg.fillGradientStyle(0x8350f0, 0x8350f0, 0x4a22a6, 0x4a22a6, 1).fillRoundedRect(-78, -26, 156, 52, 12);
-    bg.lineStyle(2.5, 0xc8b4ff).strokeRoundedRect(-78, -26, 156, 52, 12);
     const text = scene.add.text(0, 0, label, { fontFamily: 'Lora', fontSize: '21px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
-    const button = scene.add.container(x, y, [bg, text]).setSize(156, 52).setInteractive({ useHandCursor: true });
+    const w = Math.max(160, text.width + 36);
+    const bg = scene.add.graphics();
+    bg.fillGradientStyle(0x8350f0, 0x8350f0, 0x4a22a6, 0x4a22a6, 1).fillRoundedRect(-w / 2, -26, w, 52, 12);
+    bg.lineStyle(2.5, 0xc8b4ff).strokeRoundedRect(-w / 2, -26, w, 52, 12);
+    const button = scene.add.container(x, y, [bg, text]).setSize(w, 52).setInteractive({ useHandCursor: true });
     pressable(button, action);
     return button;
 }

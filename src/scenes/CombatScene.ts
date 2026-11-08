@@ -11,6 +11,12 @@ import { createTextures } from '../combat/view/textures';
 import { CURSED_CLASSROOM, DEPTH, enemyArt, themeTextures, wizardFeet } from '../combat/view/theme';
 import { WizardSprite } from '../combat/view/WizardSprite';
 import { mapProgressStore } from '../state/mapProgressStore';
+import { createPauseMenu, type PauseMenuController } from '../../pause menu/index.js';
+import { createSceneOverlay } from '../ui/sceneOverlay';
+import { createSettingsModal, type SettingsModalController } from '../ui/settingsModal';
+import { soundManager } from '../audio/soundManager';
+import '../ui/modal.css';
+import '../ui/game-ui.css';
 
 // This scene only draws state and reacts to events.
 
@@ -37,6 +43,10 @@ export class CombatScene extends Phaser.Scene {
   private walkInReady: (() => void) | undefined;
   /** Animation clock that stops while paused. */
   private animTime = 0;
+
+  private pauseMenu: PauseMenuController | null = null;
+  private settingsModal: SettingsModalController | null = null;
+  private overlayHost: { element: HTMLElement; destroy: () => void } | null = null;
 
   constructor() {
     super('Combat');
@@ -82,8 +92,64 @@ export class CombatScene extends Phaser.Scene {
       onMenu: () => this.toMenu(),
     });
 
+    const host = createSceneOverlay(this);
+    this.overlayHost = host;
+
+    // Dev victory button (allows testing level unlocks/progression immediately)
+    const winTrigger = document.createElement('button');
+    winTrigger.type = 'button';
+    winTrigger.className = 'game-victory-trigger';
+    winTrigger.textContent = 'Complete Level (Dev)';
+    winTrigger.title = 'Dev shortcut: simulate beating this level (or press Shift+W)';
+    winTrigger.onclick = () => this.triggerVictory();
+    host.element.append(winTrigger);
+
+    this.pauseMenu = createPauseMenu(host.element, {
+      visible: false,
+      callbacks: {
+        resume: ({ menu }) => {
+          soundManager.playSfx('click');
+          menu.setVisible(false);
+          this.unpauseGame();
+        },
+        restart: () => {
+          soundManager.playSfx('click');
+          this.restart();
+        },
+        settings: async ({ menu, signal }) => {
+          soundManager.playSfx('modalOpen');
+          menu.setVisible(false);
+          await new Promise<void>((resolve) => {
+            const modal = createSettingsModal(host.element, {
+              signal,
+              onClose: () => {
+                this.settingsModal = null;
+                soundManager.playSfx('modalClose');
+                resolve();
+              },
+            });
+            this.settingsModal = modal;
+          });
+          if (!signal.aborted) menu.setVisible(true);
+        },
+        quit: () => {
+          soundManager.playSfx('click');
+          this.toMenu();
+        },
+      },
+    });
+
     this.input.keyboard!.on('keydown', (event: KeyboardEvent) => this.onKey(event));
     this.cameras.main.fadeIn(400, 5, 2, 12);
+
+    this.events.once('shutdown', () => {
+      this.settingsModal?.destroy();
+      this.settingsModal = null;
+      this.pauseMenu?.destroy();
+      this.pauseMenu = null;
+      this.overlayHost?.destroy();
+      this.overlayHost = null;
+    });
   }
 
   update(time: number, delta: number): void {
@@ -113,6 +179,11 @@ export class CombatScene extends Phaser.Scene {
       this.togglePause();
       return;
     }
+    // Dev shortcut: Shift + W triggers instant level completion for testing
+    if (event.shiftKey && (event.key === 'W' || event.key === 'w')) {
+      this.triggerVictory();
+      return;
+    }
     if (status === 'won' || status === 'lost' || this.paused) {
       if (event.key === 'r' || event.key === 'R') this.restart();
       if (event.key === 'm' || event.key === 'M') this.toMenu();
@@ -140,16 +211,37 @@ export class CombatScene extends Phaser.Scene {
   private togglePause(): void {
     const status = this.model.getStatus();
     if (status === 'won' || status === 'lost') return;
-    this.paused = !this.paused;
     if (this.paused) {
-      this.tweens.pauseAll();
-      this.time.paused = true;
-      this.hud.showOverlay('paused');
+      this.unpauseGame();
     } else {
-      this.tweens.resumeAll();
-      this.time.paused = false;
-      this.hud.showOverlay(undefined);
+      this.pauseGame();
     }
+  }
+
+  private pauseGame(): void {
+    if (this.paused) return;
+    this.paused = true;
+    this.tweens.pauseAll();
+    this.time.paused = true;
+    soundManager.playSfx('modalOpen');
+    this.pauseMenu?.setVisible(true);
+  }
+
+  private unpauseGame(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    this.pauseMenu?.setVisible(false);
+    this.tweens.resumeAll();
+    this.time.paused = false;
+  }
+
+  private triggerVictory(): void {
+    if (this.paused) {
+      this.unpauseGame();
+    }
+    soundManager.playSfx('start');
+    mapProgressStore.completeLevel(this.moduleId, this.levelId);
+    this.hud.showOverlay('won');
   }
 
   private restart(): void {
@@ -159,7 +251,7 @@ export class CombatScene extends Phaser.Scene {
 
   private toMenu(): void {
     this.time.paused = false;
-    this.scene.start('MainMenu');
+    this.scene.start('MainMenu', { showMap: true, roomIndex: this.moduleId - 1 });
   }
 
   // ---------------------------------------------------------------- events

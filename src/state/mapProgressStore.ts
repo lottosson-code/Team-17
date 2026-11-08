@@ -48,13 +48,10 @@ export function getLevelNodeDefinition(moduleId: number, levelId: number): Level
     return {
       moduleId,
       levelId: 1,
-      label: 'Level 1 (Start)',
+      label: 'Level 1',
       x: 220,
       y: 380,
-      unlocks: [
-        { moduleId, levelId: 2 },
-        { moduleId, levelId: 3 },
-      ],
+      unlocks: [{ moduleId, levelId: 2 }],
       prerequisiteDescription:
         moduleId === 1
           ? 'Unlocked by default'
@@ -65,10 +62,10 @@ export function getLevelNodeDefinition(moduleId: number, levelId: number): Level
     return {
       moduleId,
       levelId: 2,
-      label: 'Level 2 (Upper Path)',
+      label: 'Level 2',
       x: 500,
       y: 240,
-      unlocks: [{ moduleId, levelId: 4 }],
+      unlocks: [{ moduleId, levelId: 3 }],
       prerequisiteDescription: 'Complete Level 1 first',
     };
   }
@@ -76,22 +73,25 @@ export function getLevelNodeDefinition(moduleId: number, levelId: number): Level
     return {
       moduleId,
       levelId: 3,
-      label: 'Level 3 (Lower Path)',
+      label: 'Level 3',
       x: 500,
       y: 520,
-      unlocks: [{ moduleId, levelId: 4 }],
-      prerequisiteDescription: 'Complete Level 1 first',
+      unlocks: [
+        { moduleId, levelId: 4 },
+        { moduleId, levelId: 6 },
+      ],
+      prerequisiteDescription: 'Complete Level 2 first',
     };
   }
   if (levelId === 4) {
     return {
       moduleId,
       levelId: 4,
-      label: 'Level 4 (Convergence)',
+      label: 'Level 4',
       x: 790,
       y: 380,
       unlocks: [{ moduleId, levelId: 5 }],
-      prerequisiteDescription: 'Complete Level 2 or Level 3 first',
+      prerequisiteDescription: 'Complete Level 3 first',
     };
   }
   if (levelId === 5) {
