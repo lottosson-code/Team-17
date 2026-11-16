@@ -101,6 +101,51 @@ export class BlacksmithModel {
     }
 
     /**
+     * Builds a 2-item equation that randomly uses '+' or '-'.
+     * When using '-', puts the larger item first so targetSum is never negative.
+     */
+    private createTwoItemEquation(itemA: ItemId, itemB: ItemId): ForgeEquation {
+        const useSubtraction = this.rng() < 0.5;
+
+        if (!useSubtraction) {
+            return {
+                terms: [itemA, itemB],
+                operator: '+',
+                targetSum: this.solution[itemA] + this.solution[itemB],
+            };
+        }
+
+        const valA = this.solution[itemA];
+        const valB = this.solution[itemB];
+
+        if (valA >= valB) {
+            return {
+                terms: [itemA, itemB],
+                operator: '-',
+                targetSum: valA - valB,
+            };
+        } else {
+            return {
+                terms: [itemB, itemA],
+                operator: '-',
+                targetSum: valB - valA,
+            };
+        }
+    }
+
+    /**
+     * Randomly swaps items in an array so equations or items appear in different orders.
+     */
+    private shuffleArray<T>(list: T[]): void {
+        for (let i = list.length - 1; i > 0; i--) {
+            const randomIndex = this.getRandomInt(0, i);
+            const temp = list[i];
+            list[i] = list[randomIndex];
+            list[randomIndex] = temp;
+        }
+    }
+
+    /**
      * Picks whole numbers for each item first, then builds the equations
      * from those numbers so every puzzle has a whole-number solution.
      */
@@ -109,51 +154,68 @@ export class BlacksmithModel {
 
         this.items = FORGE_ITEMS.slice(0, config.variableCount);
 
+        const activeIds: ItemId[] = [];
         for (let i = 0; i < this.items.length; i++) {
             const item = this.items[i];
             this.solution[item.id] = this.getRandomInt(config.minVal, config.maxVal);
             this.playerGuesses[item.id] = null;
+            activeIds.push(item.id);
         }
 
-        const first = this.items[0].id;
-        const second = this.items[1].id;
+        // Shuffle which item is 'first', 'second', and 'third' so the starter
+        // equation isn't always Feather + Feather
+        this.shuffleArray(activeIds);
 
-        // First two equations use the first two items
-        const eqs: ForgeEquation[] = [
-            {
-                terms: [first, first],
-                operator: '+',
-                targetSum: this.solution[first] + this.solution[first],
-            },
-            {
-                terms: [first, second],
-                operator: '+',
-                targetSum: this.solution[first] + this.solution[second],
-            },
-        ];
+        const first = activeIds[0];
+        const second = activeIds[1];
 
-        // Add third equation when difficulty has 3 variables
+        const eqs: ForgeEquation[] = [];
+
+        // Equation 1: Starter equation (always addition of the same item so it's solvable)
+        eqs.push({
+            terms: [first, first],
+            operator: '+',
+            targetSum: this.solution[first] + this.solution[first],
+        });
+
+        // Equation 2: Randomly '+' or '-' between first and second item
+        const secondEq = this.createTwoItemEquation(first, second);
+        eqs.push(secondEq);
+
+        // Equation 3: Added when difficulty has 3 variables
         if (config.variableCount === 3) {
-            const third = this.items[2].id;
-            let terms: ItemId[];
+            const third = activeIds[2];
 
             if (this.difficulty === 'hard') {
-                terms = [first, second, third];
+                // Hard mode: 50% chance of 3-item addition, 50% chance of 2-item '+' or '-'
+                const useThreeItems = this.rng() < 0.5;
+
+                if (useThreeItems) {
+                    const terms: ItemId[] = [first, second, third];
+                    let targetSum = 0;
+
+                    for (let i = 0; i < terms.length; i++) {
+                        targetSum += this.solution[terms[i]];
+                    }
+
+                    eqs.push({
+                        terms: terms,
+                        operator: '+',
+                        targetSum: targetSum,
+                    });
+                } else {
+                    const thirdEq = this.createTwoItemEquation(second, third);
+                    eqs.push(thirdEq);
+                }
             } else {
-                terms = [second, third];
+                // Medium mode: Randomly '+' or '-' between second and third item
+                const thirdEq = this.createTwoItemEquation(second, third);
+                eqs.push(thirdEq);
             }
-
-            let targetSum = 0;
-            for (let i = 0; i < terms.length; i++) {
-                targetSum += this.solution[terms[i]];
-            }
-
-            eqs.push({
-                terms: terms,
-                operator: '+',
-                targetSum: targetSum,
-            });
         }
+
+        // Shuffle the order of equations so the [x + x] clue can be on row 1, 2, or 3
+        this.shuffleArray(eqs);
 
         this.equations = eqs;
     }
@@ -233,8 +295,7 @@ export class BlacksmithModel {
                     const guessValue = this.playerGuesses[termId] as number;
                     evaluatedSum += guessValue;
                 }
-            } 
-            else {
+            } else {
                 const firstTermId = eq.terms[0];
                 evaluatedSum = this.playerGuesses[firstTermId] as number;
 
