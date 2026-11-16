@@ -6,12 +6,14 @@ Students get four numbers and combine them with + − × ÷ until one card is le
 
 | Path | What it is |
 | --- | --- |
-| `src/logic.ts` | Pure game logic: exact fractions, a solver, and a random puzzle generator that only returns solvable puzzles. No DOM. |
-| `src/make24.ts` | The UI component: `mountMake24(container, options)`. Handles cards, operations, undo/reset, coins and the win screen. |
+| `src/logic.ts` | Math rules: exact fractions, a solver, and a random puzzle generator that only returns solvable puzzles. No page code. |
+| `src/Make24Model.ts` | **Model.** The game state and rules: the cards, picking and combining, undo/reset, winning, coins, streak and timer. No page code. |
+| `src/Make24View.ts` | **View.** Builds the HTML and redraws it from the model. Never changes the game. |
+| `src/make24.ts` | **Controller.** `mountMake24(container, options)`: turns clicks and keys into model calls, tells the view to redraw, and reports results through callbacks. |
 | `src/make24.css` | Styles. Every class starts with `cse-make24` so nothing leaks into the rest of the game. Colors match the main menu. |
 | `fonts/` | Lora (titles) and Poppins (everything else), subset to Latin. SIL Open Font License, see `fonts/FONTS-LICENSE.txt`. |
 | `make24-demo.html` | Self-contained demo. Double-click it to play without running the project. |
-| `src/Tests/make24/` (repo root) | Unit tests for `logic.ts` and component tests for `make24.ts`. |
+| `src/Tests/make24/` (repo root) | Unit tests for `logic.ts` and `Make24Model.ts`, and component tests for the whole minigame. |
 
 ## Using it
 
@@ -57,7 +59,8 @@ The minigame only tracks coins while it's open. Saving them to the player's prof
 - **Exact arithmetic.** All values are `Fraction`s, so 8 ÷ 3 stays exactly 8/3 and puzzles like `3 3 8 8 → 8 ÷ (3 − 8 ÷ 3)` work with no rounding errors.
 - **Solver.** `findSolution` tries every pair of values with every operation, recursively, until one value is left. It prefers solutions with whole numbers only, then without negatives, then anything.
 - **Puzzle generator.** `generatePuzzle` rolls four numbers in the difficulty's range and keeps them only if the solver finds an answer (whole numbers only on Easy). It accepts a seeded `rng` for repeatable puzzles.
-- **UI state.** The component keeps the current cards, the steps taken and a history for undo. Each combine replaces two cards with one card in the second card's spot, and the new card stays selected so the student can keep going.
+- **Model / View / Controller.** A click goes to the controller (`make24.ts`), which calls the model (for example `model.pickCard(id)`). The model returns what happened (`'combined'`, `'divide-by-zero'`, `'solved'`…), the controller shows the right message, and the view redraws from the model.
+- **Combining cards.** Each combine saves a snapshot for Undo, then replaces two cards with one card in the second card's spot. The new card stays selected so the student can keep going.
 
 ## Running the tests
 
@@ -68,6 +71,7 @@ npx vitest run src/Tests/make24
 ```
 
 - `make24Logic.test.ts` tests fractions, the solver (including the known count of 1362 solvable hands out of 1820) and the generator, using a seeded random number generator.
+- `make24Model.test.ts` tests the game rules directly, with no page: picking, combining, divide by zero, wrong totals, solving, coins, undo/reset, skipping and the timer.
 - `make24Component.test.ts` mounts the game in jsdom and clicks through it: combining cards, fractions, negatives, divide by zero, undo/reset, wrong answers, solving, coins, skipping, exiting and cleanup. Timers are faked so time-based results are exact.
 
 The component tests need `jsdom` as a dev dependency (`npm install -D jsdom`). Keyboard shortcuts aren't covered by the tests, because jsdom doesn't lay out the page.
