@@ -3,6 +3,10 @@ import { BlacksmithModel } from '../BlacksmithModel';
 import { BlacksmithController } from '../BlacksmithController';
 import { BlacksmithViewInterface } from '../BlacksmithView';
 
+function fixedRandom(): number {
+    return 0.6;
+}
+
 function createMockView(): BlacksmithViewInterface {
     return {
         renderPuzzle: vi.fn(),
@@ -18,8 +22,7 @@ function createMockView(): BlacksmithViewInterface {
 
 describe('BlacksmithController', function () {
     it('renders the initial puzzle and stats on startup', function () {
-        const mockRng = vi.fn().mockReturnValue(0.4);
-        const model = new BlacksmithModel('easy', mockRng);
+        const model = new BlacksmithModel('easy', fixedRandom);
         const mockView = createMockView();
 
         new BlacksmithController(model, mockView);
@@ -29,8 +32,7 @@ describe('BlacksmithController', function () {
     });
 
     it('updates the model and refreshes the view when difficulty changes', function () {
-        const mockRng = vi.fn().mockReturnValue(0.4);
-        const model = new BlacksmithModel('easy', mockRng);
+        const model = new BlacksmithModel('easy', fixedRandom);
         const mockView = createMockView();
         const controller = new BlacksmithController(model, mockView);
 
@@ -41,8 +43,7 @@ describe('BlacksmithController', function () {
     });
 
     it('parses valid typed integer strings and updates the model', function () {
-        const mockRng = vi.fn().mockReturnValue(0.4);
-        const model = new BlacksmithModel('easy', mockRng);
+        const model = new BlacksmithModel('easy', fixedRandom);
         const mockView = createMockView();
         const controller = new BlacksmithController(model, mockView);
 
@@ -53,8 +54,7 @@ describe('BlacksmithController', function () {
     });
 
     it('returns INVALID_NUMBER when player mistypes non-numeric text', function () {
-        const mockRng = vi.fn().mockReturnValue(0.4);
-        const model = new BlacksmithModel('easy', mockRng);
+        const model = new BlacksmithModel('easy', fixedRandom);
         const mockView = createMockView();
         const controller = new BlacksmithController(model, mockView);
 
@@ -69,8 +69,7 @@ describe('BlacksmithController', function () {
     });
 
     it('upgrades stats and refreshes puzzle when typed guesses are correct', function () {
-        const mockRng = vi.fn().mockReturnValue(0.4);
-        const model = new BlacksmithModel('easy', mockRng);
+        const model = new BlacksmithModel('easy', fixedRandom);
         const mockView = createMockView();
         const onStatsUpgraded = vi.fn();
 
