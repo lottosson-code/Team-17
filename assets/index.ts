@@ -16,3 +16,11 @@ export const ASSETS = {
     largeEraser: new URL('./characters/large-eraser.png', import.meta.url).href,
   },
 };
+
+/** Chalk colours in assets/chalk/. */
+export type ChalkColor = 'white' | 'yellow' | 'orange';
+
+/** URL of one chalk character image; glyph is '0'-'9', 'times', 'plus' or 'equals'. */
+export function chalkGlyphUrl(color: ChalkColor, glyph: string): string {
+  return new URL(`./chalk/${color}-${glyph}.png`, import.meta.url).href;
+}

@@ -13,6 +13,24 @@ export interface MainMenuSceneData {
   roomIndex?: number;
 }
 
+/**
+ * Main menu progress, from the same store the map uses.
+ * classroom/level: first main level not completed yet (minigames ignored).
+ * completedRatio: completed share of all main levels.
+ */
+export function currentProgress(): { classroom: number; level: number; completedRatio: number } {
+  // Completed main levels across all classrooms.
+  const { completedCount, totalCount } = mapProgressStore.getTotalProgress();
+  const completedRatio = completedCount / totalCount;
+  // Scan in play order; return the first level not completed.
+  for (let classroom = 1; classroom <= 3; classroom++) {
+    for (let level = 1; level <= 5; level++) {
+      if (!mapProgressStore.isLevelCompleted(classroom, level)) return { classroom, level, completedRatio };
+    }
+  }
+  return { classroom: 3, level: 5, completedRatio }; // everything done
+}
+
 export class MainMenuScene extends Phaser.Scene {
   public ui: GameUIController | null = null;
   public settingsModal: SettingsModalController | null = null;
@@ -41,10 +59,14 @@ export class MainMenuScene extends Phaser.Scene {
           mapProgressStore.isLevelCompleted(roomIndex + 1, levelNum),
       },
       menu: {
+        // Read fresh progress whenever this scene starts.
+        progress: currentProgress(),
         callbacks: {
-          newGame: () => {
+          newGame: ({ menu }) => {
             soundManager.playSfx('click');
             mapProgressStore.resetProgress();
+            // Redraw after the reset (`?.`: tests call this without a menu).
+            menu?.update({ progress: currentProgress() });
             ui.showMap();
           },
           continue: () => {
