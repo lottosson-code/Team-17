@@ -219,4 +219,21 @@ describe('QuitModal', () => {
     expect(host.children.length).toBe(0);
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
+
+  it('dynamically updates Tab focus trap when transitioning to the farewell screen', () => {
+    createQuitModal(host as unknown as HTMLElement);
+
+    const confirmBtn = findElementBy(host, (el) => el.textContent === 'Confirm Quit')!;
+    confirmBtn.click();
+
+    const returnBtn = findElementBy(host, (el) => el.textContent === 'Return to Menu')!;
+    expect(returnBtn).not.toBeNull();
+    expect(doc.activeElement).toBe(returnBtn);
+
+    const keydownListeners = doc.listeners['keydown'] || [];
+    keydownListeners.forEach((fn) =>
+      fn({ key: 'Tab', shiftKey: false, preventDefault: vi.fn() })
+    );
+    expect(doc.activeElement).toBe(returnBtn);
+  });
 });
