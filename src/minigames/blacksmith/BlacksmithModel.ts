@@ -1,5 +1,6 @@
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type ItemId = 'feather' | 'potion' | 'ingot';
+export type EquationOperator = '+' | '-';
 
 export interface ForgeItem {
     id: ItemId;
@@ -9,7 +10,7 @@ export interface ForgeItem {
 
 export interface ForgeEquation {
     terms: ItemId[];
-    operator: '+';
+    operator: EquationOperator;
     targetSum: number;
 }
 
@@ -226,10 +227,22 @@ export class BlacksmithModel {
             const eq = this.equations[i];
             let evaluatedSum = 0;
 
-            for (let j = 0; j < eq.terms.length; j++) {
-                const termId = eq.terms[j];
-                const guessValue = this.playerGuesses[termId] as number;
-                evaluatedSum += guessValue;
+            if (eq.operator === '+') {
+                for (let j = 0; j < eq.terms.length; j++) {
+                    const termId = eq.terms[j];
+                    const guessValue = this.playerGuesses[termId] as number;
+                    evaluatedSum += guessValue;
+                }
+            } 
+            else {
+                const firstTermId = eq.terms[0];
+                evaluatedSum = this.playerGuesses[firstTermId] as number;
+
+                for (let j = 1; j < eq.terms.length; j++) {
+                    const nextTermId = eq.terms[j];
+                    const guessValue = this.playerGuesses[nextTermId] as number;
+                    evaluatedSum -= guessValue;
+                }
             }
 
             const isSatisfied = evaluatedSum === eq.targetSum;
