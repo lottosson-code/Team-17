@@ -346,8 +346,15 @@ function asList(entry: string | string[]): string[] {
     return typeof entry === 'string' ? [entry] : entry;
 }
 
-function countEnemies(group: SpawnGroup): number {
-    return group.enemies.reduce((sum, entry) => sum + asList(entry).length, 0);
+/** How many enemies a group adds up to, counting everything its enemies split into. */
+function countEnemies(group: SpawnGroup, kinds: Record<string, EnemyKind>): number {
+    return group.enemies.flatMap(asList).reduce((sum, kindId) => sum + enemyWeight(kinds, kindId), 0);
+}
+
+/** One enemy of this kind, plus everything it splits into, all the way down. */
+function enemyWeight(kinds: Record<string, EnemyKind>, kindId: string): number {
+    const split = kinds[kindId].split;
+    return split ? 1 + split.count * enemyWeight(kinds, split.into) : 1;
 }
 
 /** Gap before the next entry, after `spawned` entries of the group have appeared. */
