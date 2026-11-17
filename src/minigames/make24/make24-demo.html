@@ -174,6 +174,17 @@
 .cse-make24__difficulty button:hover { background: #75563822; }
 .cse-make24__difficulty button[aria-pressed="true"] { background: var(--m24-button-color); color: #fff; }
 
+.cse-make24__tools { display: flex; flex: none; align-items: center; gap: .8cqw; }
+.cse-make24__help {
+  appearance: none; margin: 0; padding: 0;
+  width: 2.5cqw; height: 2.5cqw; border-radius: 50%;
+  font-family: var(--m24-title-font); font-size: 1.5cqw; font-weight: 700; line-height: 1;
+  color: var(--m24-button-color); background: #f7eed48c;
+  border: .12cqw solid var(--m24-button-color);
+  transition: background-color 140ms ease, color 140ms ease;
+}
+.cse-make24__help:hover { background: var(--m24-button-color); color: #fff; }
+
 /* ---- number cards ----------------------------------------------------- */
 .cse-make24__cards {
   display: grid; grid-template-columns: repeat(4, 9.4cqw); justify-content: center; gap: 2cqw;
@@ -285,7 +296,7 @@
 .cse-make24__actions button:disabled { opacity: .4; }
 
 /* ---- win overlay ------------------------------------------------------ */
-.cse-make24__overlay {
+.cse-make24__overlay, .cse-make24__tutorial {
   position: absolute; inset: 0; z-index: 5;
   display: grid; place-items: center;
   background: #120d0aa6;
@@ -324,6 +335,73 @@
 .cse-make24__primary:hover { background: var(--m24-button-hover-color); }
 .cse-make24__secondary { color: var(--m24-button-color); background: transparent; border: .12cqw solid var(--m24-button-color); }
 .cse-make24__secondary:hover { background: #f7eed48c; }
+
+/* ---- how-to-play card ---------------------------------------------- */
+.cse-make24__tutorial { z-index: 6; }
+.cse-make24__tutorial-card {
+  width: 64%; padding: 2cqw 2.4cqw 1.8cqw; text-align: center;
+  background: var(--m24-panel-color);
+  border: .1cqw solid var(--m24-frame-color);
+  box-shadow: 0 .4cqw 2cqw #0009, inset 0 0 0 .45cqw #c9b88f, inset 0 0 0 .55cqw var(--m24-frame-color);
+  animation: cse-make24-rise 280ms ease-out;
+}
+.cse-make24__tutorial-title {
+  margin: 0; font-family: var(--m24-title-font); font-size: 3.2cqw; line-height: 1.1;
+  color: var(--m24-title-color); -webkit-text-stroke: .1cqw var(--m24-title-outline); paint-order: stroke fill;
+  text-shadow: 0 .2cqw .05cqw #3a2c20;
+}
+.cse-make24__tutorial-goal { margin: .6cqw 0 1.4cqw; font-size: 1.45cqw; }
+.cse-make24__tutorial-goal b { font-family: var(--m24-title-font); font-size: 1.7cqw; }
+.cse-make24__tutorial-steps {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.1cqw;
+  counter-reset: cse-make24-step;
+}
+.cse-make24__tutorial-steps li {
+  position: relative; counter-increment: cse-make24-step;
+  display: flex; flex-direction: column; align-items: center; gap: .35cqw;
+  padding: 1.1cqw .8cqw 1cqw;
+  background: #f7eed4b3; border: .1cqw solid var(--m24-frame-color); border-radius: .5cqw;
+}
+.cse-make24__tutorial-steps li::before {
+  content: counter(cse-make24-step);
+  position: absolute; top: -.9cqw; left: 50%; transform: translateX(-50%);
+  width: 1.8cqw; height: 1.8cqw; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 1.05cqw; font-weight: 700; color: #fff; background: var(--m24-button-color);
+}
+.cse-make24__tutorial-steps b { font-size: 1.3cqw; }
+.cse-make24__tutorial-steps li > span { font-size: 1.1cqw; line-height: 1.3; color: var(--m24-ink-soft); }
+.cse-make24__tut-art {
+  height: 6.6cqw; display: flex; align-items: center; justify-content: center; gap: .5cqw;
+}
+.cse-make24__tut-card {
+  width: 4.2cqw; height: 5.4cqw; border-radius: .45cqw;
+  display: grid; place-items: center;
+  font-family: var(--m24-body-font); font-size: 2.4cqw; font-weight: 700; color: var(--m24-ink);
+  background: var(--m24-card); border: .14cqw solid var(--m24-card-edge);
+  box-shadow: 0 .2cqw 0 #6c5134;
+}
+.cse-make24__tut-card.is-selected {
+  transform: translateY(-.4cqw); border-color: var(--m24-gold);
+  box-shadow: 0 0 0 .18cqw var(--m24-focus-color), 0 .2cqw 0 #8a6427, 0 .3cqw .9cqw #f3c25a99;
+}
+.cse-make24__tut-card.is-win {
+  color: var(--m24-good); border-color: var(--m24-gold);
+  box-shadow: 0 0 0 .18cqw var(--m24-focus-color), 0 0 1.4cqw #ffd76acc;
+}
+.cse-make24__tut-frac { display: inline-flex; flex-direction: column; align-items: center; font-size: 1.5cqw; line-height: 1.05; }
+.cse-make24__tut-frac span:first-child { padding: 0 .25cqw .1cqw; border-bottom: .14cqw solid currentColor; }
+.cse-make24__tut-op {
+  width: 4.6cqw; height: 3.2cqw; border-radius: .25cqw;
+  display: grid; place-items: center;
+  font-family: var(--m24-body-font); font-size: 2.1cqw; font-weight: 700;
+  color: var(--m24-button-color); background: var(--m24-title-color);
+  box-shadow: inset 0 0 0 .16cqw var(--m24-gold), 0 .2cqw 0 #8a6427, 0 0 .9cqw #ffd76a99;
+}
+.cse-make24__tut-arrow { font-size: 1.6cqw; color: var(--m24-ink-soft); }
+.cse-make24__tutorial-tip { margin: 1.3cqw 0 1.2cqw; font-size: 1.2cqw; color: var(--m24-ink-soft); }
+.cse-make24__tutorial .cse-make24__primary { min-width: 14cqw; }
 
 /* ---- motion ----------------------------------------------------------- */
 @keyframes cse-make24-pop { from { transform: scale(.82); } 70% { transform: scale(1.06); } to { transform: scale(1); } }
@@ -635,6 +713,8 @@ class Make24Model {
         this.lastPuzzleKey = '';
         this.startedAt = 0;
         this.solveTimeMs = 0;
+        /** When the clock was paused, or null while it's running. */
+        this.pausedAt = null;
         this.target = settings.target;
         this.difficulty = settings.difficulty;
         this.coins = toWholeCoins(settings.coins);
@@ -655,11 +735,25 @@ class Make24Model {
     cardInSlot(slot) {
         return this.cards.find((card) => card.slot === slot);
     }
-    /** Time spent on the current puzzle. Stops counting once it's solved. */
+    /** Time spent on the current puzzle. Stops counting once it's solved, and while paused. */
     elapsedMs() {
         if (this.solved)
             return this.solveTimeMs;
+        if (this.pausedAt !== null)
+            return this.pausedAt - this.startedAt;
         return Date.now() - this.startedAt;
+    }
+    // ---- pausing the clock (e.g. while the how-to-play card is open) --------
+    pauseClock() {
+        if (this.pausedAt === null)
+            this.pausedAt = Date.now();
+    }
+    resumeClock() {
+        if (this.pausedAt === null)
+            return;
+        // Move the start forward by however long the clock was paused, so that time doesn't count.
+        this.startedAt += Date.now() - this.pausedAt;
+        this.pausedAt = null;
     }
     // ---- starting puzzles --------------------------------------------------
     /** Start a new puzzle: the given four numbers, or a random solvable one. */
@@ -686,6 +780,9 @@ class Make24Model {
         this.freshId = null;
         this.solved = false;
         this.startedAt = Date.now();
+        // A puzzle dealt while the clock is paused starts paused at 0:00.
+        if (this.pausedAt !== null)
+            this.pausedAt = this.startedAt;
     }
     /**
      * Leave the current puzzle. Leaving an unsolved puzzle ends the streak and
@@ -852,6 +949,120 @@ function toWholeCoins(amount) {
 }
 
 /**
+ * The Make 24 "How to play" card: its HTML, and remembering whether the player has seen it.
+ * Make24View puts the card on the page; make24.ts decides when to open and close it.
+ */
+/** Storage key that remembers the player has seen the card. */
+const TUTORIAL_SEEN_KEY = 'cse-make24-tutorial-seen';
+/** Same class prefix as the rest of the minigame. */
+const PREFIX = 'cse-make24';
+// ---- remembering that the card was seen ------------------------------------
+/**
+ * The browser's localStorage, or undefined if there isn't one
+ * (some test setups, or storage blocked by the browser).
+ */
+function browserStorage() {
+    try {
+        const storage = globalThis.localStorage;
+        if (storage === undefined || storage === null) {
+            return undefined;
+        }
+        return storage;
+    }
+    catch {
+        return undefined;
+    }
+}
+/** Whether the card should open by itself when the game starts. */
+function shouldShowTutorialAtStart(mode, storage) {
+    if (mode === 'always') {
+        return true;
+    }
+    if (mode === 'never') {
+        return false;
+    }
+    return !hasSeenTutorial(storage);
+}
+// Storage can be missing or blocked (private browsing, strict settings),
+// so these never throw. The game must still work without them.
+function hasSeenTutorial(storage) {
+    if (storage === undefined) {
+        return false;
+    }
+    try {
+        return storage.getItem(TUTORIAL_SEEN_KEY) === '1';
+    }
+    catch {
+        return false;
+    }
+}
+function rememberTutorialSeen(storage) {
+    if (storage === undefined) {
+        return;
+    }
+    try {
+        storage.setItem(TUTORIAL_SEEN_KEY, '1');
+    }
+    catch {
+        // Not saved, so the card may show again next time. That's harmless.
+    }
+}
+// ---- HTML -------------------------------------------------------------------
+/** The round ? button that opens the card. */
+function helpButtonHTML() {
+    return `
+    <button type="button" class="${PREFIX}__help" data-action="help"
+      aria-label="How to play" title="How to play">?</button>`;
+}
+/** The card itself, hidden until it's opened. Four steps, each with a small picture. */
+function tutorialHTML(target) {
+    const step1 = stepHTML(cardPicture('8', 'is-selected'), 'Tap a number', "It lifts up to show it's picked.");
+    const step2 = stepHTML(operationPicture('÷'), 'Tap an operation', 'Choose + − × or ÷.');
+    const step3 = stepHTML(mergePicture(), 'Tap another number', 'The two cards merge into one.');
+    const step4 = stepHTML(cardPicture(String(target), 'is-win'), `Make ${target}`, 'Keep going until one card is left.');
+    return `
+    <div class="${PREFIX}__tutorial" hidden>
+      <div class="${PREFIX}__tutorial-card" role="dialog" aria-modal="true"
+        aria-labelledby="${PREFIX}-tutorial-title">
+        <h3 id="${PREFIX}-tutorial-title" class="${PREFIX}__tutorial-title">How to play</h3>
+        <p class="${PREFIX}__tutorial-goal">
+          Use all four numbers exactly once to make <b>${target}</b>.
+        </p>
+        <ol class="${PREFIX}__tutorial-steps">${step1}${step2}${step3}${step4}</ol>
+        <p class="${PREFIX}__tutorial-tip">
+          Made a mistake? <b>Undo</b> goes back one step and <b>Reset</b> starts over.
+        </p>
+        <button type="button" class="${PREFIX}__primary" data-action="close-tutorial">
+          Got it
+        </button>
+      </div>
+    </div>`;
+}
+/** One numbered step: a small picture, a title and one line of detail. */
+function stepHTML(picture, title, detail) {
+    return `
+    <li>
+      <div class="${PREFIX}__tut-art" aria-hidden="true">${picture}</div>
+      <b>${title}</b>
+      <span>${detail}</span>
+    </li>`;
+}
+/** A small number card. `state` is an extra class like 'is-selected', or '' for none. */
+function cardPicture(value, state) {
+    return `<span class="${PREFIX}__tut-card ${state}">${value}</span>`;
+}
+/** A small, picked operation button. */
+function operationPicture(symbol) {
+    return `<span class="${PREFIX}__tut-op is-selected">${symbol}</span>`;
+}
+/** "3 → 8/3": the second card, an arrow, then the merged card. */
+function mergePicture() {
+    const fraction = `<span class="${PREFIX}__tut-frac"><span>8</span><span>3</span></span>`;
+    const arrow = `<span class="${PREFIX}__tut-arrow">→</span>`;
+    return cardPicture('3', '') + arrow + cardPicture(fraction, '');
+}
+
+/**
  * Draws the Make 24 minigame on the page.
  *
  * The view never changes the game. It builds the HTML once, then redraws it from
@@ -869,6 +1080,7 @@ class Make24View {
         this.logEl = this.find(`.${C}__log`);
         this.feedbackEl = this.find(`.${C}__feedback`);
         this.winScreenEl = this.find(`.${C}__overlay`);
+        this.tutorialEl = this.find(`.${C}__tutorial`);
         this.coinsEl = this.find('[data-stat="coins"]');
         this.solvedEl = this.find('[data-stat="solved"]');
         this.streakEl = this.find('[data-stat="streak"]');
@@ -922,6 +1134,22 @@ class Make24View {
     }
     get isWinScreenShown() {
         return !this.winScreenEl.hidden;
+    }
+    // ---- how-to-play card --------------------------------------------------
+    showTutorial() {
+        this.tutorialEl.hidden = false;
+        this.find('[data-action="close-tutorial"]').focus();
+    }
+    hideTutorial() {
+        this.tutorialEl.hidden = true;
+        this.find('[data-action="help"]').focus();
+    }
+    get isTutorialShown() {
+        return !this.tutorialEl.hidden;
+    }
+    /** True if a click landed on the dark area around the card (not on the card itself). */
+    isTutorialBackdrop(target) {
+        return target === this.tutorialEl;
     }
     /** False when the game is hidden or not on the page, so keys shouldn't control it. */
     get isVisible() {
@@ -1018,6 +1246,7 @@ function layoutHTML(target, hasBackground) {
     html += statsHTML();
     html += panelHTML(target);
     html += winScreenHTML(target);
+    html += tutorialHTML(target);
     return html;
 }
 function exitButtonHTML() {
@@ -1054,7 +1283,12 @@ function panelHTML(target) {
     <div class="${C}__panel">
       <div class="${C}__header">
         <p class="${C}__prompt">Use all four numbers once with + − × ÷ to make <b>${target}</b>.</p>
-        <div class="${C}__difficulty" role="group" aria-label="Difficulty">${difficultyButtons}</div>
+        <div class="${C}__tools">
+          <div class="${C}__difficulty" role="group" aria-label="Difficulty">
+            ${difficultyButtons}
+          </div>
+          ${helpButtonHTML()}
+        </div>
       </div>
       <div class="${C}__cards" role="group" aria-label="Number cards"></div>
       <div class="${C}__ops" role="group" aria-label="Operations">${operationButtons}</div>
@@ -1273,9 +1507,34 @@ function mountMake24(host, options = {}) {
         model.clearSelection();
         view.render(model);
     }
+    /** Open the how-to-play card. The clock pauses so reading it doesn't count as playing time. */
+    function openTutorial() {
+        if (view.isTutorialShown)
+            return;
+        model.pauseClock();
+        view.showTutorial();
+    }
+    function closeTutorial() {
+        if (!view.isTutorialShown)
+            return;
+        model.resumeClock();
+        view.hideTutorial();
+        view.renderTime(model);
+        rememberTutorialSeen(tutorialStorage());
+    }
+    function tutorialStorage() {
+        if (options.tutorialStorage)
+            return options.tutorialStorage;
+        return browserStorage();
+    }
     // ---- clicks -------------------------------------------------------------
     // One listener for the whole game: each button says what it does in a data- attribute.
     function handleClick(event) {
+        // Clicking the dark area around the how-to-play card closes it.
+        if (view.isTutorialBackdrop(event.target)) {
+            closeTutorial();
+            return;
+        }
         const button = clickedButton(event.target);
         if (button === null)
             return;
@@ -1312,6 +1571,12 @@ function mountMake24(host, options = {}) {
             case 'exit':
                 exitGame();
                 break;
+            case 'help':
+                openTutorial();
+                break;
+            case 'close-tutorial':
+                closeTutorial();
+                break;
         }
     }
     // ---- keyboard -----------------------------------------------------------
@@ -1323,12 +1588,21 @@ function mountMake24(host, options = {}) {
         if (isTypingInAField(event.target))
             return;
         let handled;
-        if (view.isWinScreenShown)
+        if (view.isTutorialShown)
+            handled = handleTutorialKey(event.key);
+        else if (view.isWinScreenShown)
             handled = handleWinScreenKey(event.key);
         else
             handled = handleGameKey(event.key);
         if (handled)
             event.preventDefault();
+    }
+    /** While the card is open only Esc works; Enter and Space press its focused "Got it" button. */
+    function handleTutorialKey(key) {
+        if (key !== 'Escape')
+            return false;
+        closeTutorial();
+        return true;
     }
     /** Returns true if the key did something. */
     function handleWinScreenKey(key) {
@@ -1359,6 +1633,8 @@ function mountMake24(host, options = {}) {
             reset();
         else if (key === 'n' || key === 'N')
             skipPuzzle();
+        else if (key === '?')
+            openTutorial();
         else if (key === 'Escape')
             clearSelection();
         else
@@ -1374,6 +1650,14 @@ function mountMake24(host, options = {}) {
         if (!model.solved)
             view.renderTime(model);
     }, TIMER_UPDATE_MS);
+    // Show the how-to-play card at the start if the tutorial option says so.
+    let tutorialMode = 'first-time';
+    if (options.tutorial !== undefined) {
+        tutorialMode = options.tutorial;
+    }
+    if (shouldShowTutorialAtStart(tutorialMode, tutorialStorage())) {
+        openTutorial();
+    }
     // ---- what the rest of the game can call ----------------------------------
     return {
         element: view.root,
@@ -1389,6 +1673,7 @@ function mountMake24(host, options = {}) {
             model.setCoins(coins);
             view.renderStats(model);
         },
+        showTutorial: openTutorial,
         destroy() {
             window.clearInterval(timerId);
             document.removeEventListener('keydown', handleKey);
