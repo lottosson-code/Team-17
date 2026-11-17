@@ -251,6 +251,17 @@
 }
 .cse-make24__op:disabled { opacity: .55; }
 
+/* ---- hints: the suggested cards and operation glow -------------------- */
+.cse-make24__card.is-hinted { border-color: var(--m24-gold); }
+.cse-make24__op.is-hinted {
+  opacity: 1;
+  box-shadow: inset 0 0 0 .2cqw var(--m24-gold), 0 .25cqw 0 #4c3722;
+}
+.cse-make24__card.is-hinted,
+.cse-make24__op.is-hinted {
+  animation: cse-make24-glow 1.2s ease-in-out infinite;
+}
+
 /* ---- step log, feedback, actions ------------------------------------- */
 .cse-make24__log {
   list-style: none; margin: 0; padding: 0;
@@ -400,6 +411,7 @@
 @keyframes cse-make24-shake { 20%, 60% { transform: translateX(-.5cqw); } 40%, 80% { transform: translateX(.5cqw); } }
 @keyframes cse-make24-bump { 40% { transform: scale(1.18); } }
 @keyframes cse-make24-fade { from { opacity: 0; } }
+@keyframes cse-make24-glow { 50% { filter: drop-shadow(0 0 1cqw #ffd76a); } }
 @keyframes cse-make24-rise { from { transform: translateY(1.5cqw); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {

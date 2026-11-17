@@ -460,3 +460,85 @@ describe('how-to-play tutorial', () => {
     expect(tutorial().hidden).toBe(true); // closing works even though saving failed
   });
 });
+
+describe('hints', () => {
+  const hintButton = () => find<HTMLButtonElement>('[data-action="hint"]');
+
+  /** Slots of the cards the hint is pointing at, e.g. [0, 2]. */
+  function hintedSlots(): number[] {
+    const hinted: number[] = [];
+    slots().forEach((card, slot) => {
+      if (card !== null && card.classList.contains('is-hinted')) {
+        hinted.push(slot);
+      }
+    });
+    return hinted;
+  }
+
+  /** The operations the hint is pointing at, e.g. ['/']. */
+  function hintedOps(): string[] {
+    const hinted: string[] = [];
+    const buttons = container.querySelectorAll<HTMLButtonElement>('[data-op].is-hinted');
+    for (const button of Array.from(buttons)) {
+      if (button.dataset.op !== undefined) {
+        hinted.push(button.dataset.op);
+      }
+    }
+    return hinted;
+  }
+
+  it('lights up two cards and an operation, and says the move', () => {
+    mount({ numbers: [3, 3, 8, 8] });
+    hintButton().click();
+    // 3 3 8 8 is solved by 8 ÷ (3 − 8 ÷ 3), so the first step is 8 ÷ 3.
+    expect(feedback()).toContain('Hint: try 8 ÷ 3');
+    expect(hintedSlots()).toEqual([0, 2]);
+    expect(hintedOps()).toEqual(['/']);
+  });
+
+  it('can be followed all the way to a solve, for half the coins', () => {
+    const onSolve = vi.fn();
+    mount({ numbers: [3, 3, 8, 8], onSolve });
+    hintButton().click();
+    combine(2, '/', 0); // 8 ÷ 3, as hinted
+    expect(hintedSlots()).toEqual([]); // the move used up the hint
+
+    hintButton().click();
+    expect(feedback()).toContain('Hint: try 3 − 8/3');
+    combine(1, '-', 0); // 3 − 8/3 = 1/3
+    combine(3, '/', 0); // 8 ÷ 1/3 = 24
+
+    const result = onSolve.mock.calls[0][0] as Make24Result;
+    expect(result.hintsUsed).toBe(2);
+    expect(result.coinsEarned).toBe(5); // Normal pays 10, halved
+    vi.advanceTimersByTime(700);
+    expect(find('.cse-make24__result-meta').textContent).toContain('2 hints');
+  });
+
+  it('says so when the cards left cannot make 24', () => {
+    mount({ numbers: [6, 6, 6, 6] });
+    combine(0, '*', 1);
+    combine(1, '*', 2); // 216 and 6 left
+    hintButton().click();
+    expect(feedback()).toContain("can't make 24 anymore");
+    expect(hintedSlots()).toEqual([]);
+  });
+
+  it('is turned off once the puzzle is solved', () => {
+    mount({ numbers: [6, 6, 6, 6] });
+    expect(hintButton().disabled).toBe(false);
+    solveSixes();
+    expect(hintButton().disabled).toBe(true);
+  });
+
+  it('does not change the coins when no hint is used', () => {
+    const onSolve = vi.fn();
+    mount({ numbers: [6, 6, 6, 6], onSolve });
+    solveSixes();
+    const result = onSolve.mock.calls[0][0] as Make24Result;
+    expect(result.hintsUsed).toBe(0);
+    expect(result.coinsEarned).toBe(10);
+    vi.advanceTimersByTime(700);
+    expect(find('.cse-make24__result-meta').textContent).not.toContain('hint');
+  });
+});

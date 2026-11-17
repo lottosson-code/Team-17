@@ -14,9 +14,10 @@
  *     onExit: () => { game.destroy(); showMap(); },
  *   });
  */
+import { OP_SYMBOL } from './logic';
 import type { Difficulty, Op } from './logic';
 import { Make24Model } from './Make24Model';
-import type { CoinReward, Make24Result, MoveOutcome } from './Make24Model';
+import type { CoinReward, Hint, Make24Result, MoveOutcome } from './Make24Model';
 import { Make24View } from './Make24View';
 import { browserStorage, rememberTutorialSeen, shouldShowTutorialAtStart } from './tutorial';
 import type { TutorialMode, TutorialStorage } from './tutorial';
@@ -41,7 +42,7 @@ export interface Make24Options {
   exitLabel?: string;
   /** Show the Easy / Normal / Hard switch. Defaults to true. */
   showDifficulty?: boolean;
-  /** Keyboard shortcuts (1–4, + − * /, Backspace, R, N, ?, Esc). Defaults to true. */
+  /** Keyboard shortcuts (1–4, + − * /, Backspace, R, N, H, ?, Esc). Defaults to true. */
   keyboard?: boolean;
   /**
    * When the how-to-play card opens by itself. 'first-time' (default): the first time
@@ -192,6 +193,27 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
     }
   }
 
+  /** Highlight a next move that still reaches the target, and say it in words. */
+  function showHint(): void {
+    if (model.solved) return;
+
+    const hint = model.useHint();
+    if (hint === null) {
+      view.setFeedback(`These numbers can't make ${target} anymore. Try Undo or Reset.`, 'warn');
+    } else {
+      view.setFeedback(`Hint: try ${hintText(hint)}. Hints halve this puzzle's coins.`);
+    }
+    view.render(model);
+  }
+
+  /** The hinted move in words, e.g. "8 ÷ 3". */
+  function hintText(hint: Hint): string {
+    const left = model.cardById(hint.leftId);
+    const right = model.cardById(hint.rightId);
+    if (left === undefined || right === undefined) return '';
+    return `${left.term.value} ${OP_SYMBOL[hint.op]} ${right.term.value}`;
+  }
+
   function changeDifficulty(difficulty: Difficulty): void {
     const changed = model.setDifficulty(difficulty);
     if (!changed) return;
@@ -262,6 +284,9 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
 
   function runAction(action: string): void {
     switch (action) {
+      case 'hint':
+        showHint();
+        break;
       case 'undo':
         undo();
         break;
@@ -335,6 +360,7 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
     if (key === 'Backspace' || key === 'u' || key === 'U') undo();
     else if (key === 'r' || key === 'R') reset();
     else if (key === 'n' || key === 'N') skipPuzzle();
+    else if (key === 'h' || key === 'H') showHint();
     else if (key === '?') openTutorial();
     else if (key === 'Escape') clearSelection();
     else return false;

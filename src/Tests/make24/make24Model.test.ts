@@ -330,3 +330,126 @@ describe('pausing the clock', () => {
     expect(model.elapsedMs()).toBe(1_000);
   });
 });
+
+describe('hints', () => {
+  /** Plays the move the hint suggests, the way a player would. */
+  function followHint(model: Make24Model): MoveOutcome | null {
+    const hint = model.useHint();
+    if (hint === null) throw new Error('Expected a hint');
+    model.pickCard(hint.leftId);
+    model.pickOperation(hint.op);
+    return model.pickCard(hint.rightId);
+  }
+
+  /** The value on a card, as text. */
+  function valueOf(model: Make24Model, id: number): string | undefined {
+    const card = model.cardById(id);
+    if (card === undefined) return undefined;
+    return card.term.value.toString();
+  }
+
+  it('solves the puzzle if you follow the hint every time', () => {
+    const puzzles = [[4, 7, 8, 9], [3, 3, 8, 8], [6, 6, 6, 6], [1, 5, 5, 5], [1, 3, 4, 6]];
+    for (const numbers of puzzles) {
+      const model = modelWith(numbers);
+      let outcome = followHint(model);
+      while (outcome !== null && outcome.kind === 'combined') {
+        outcome = followHint(model);
+      }
+      expect(outcome).not.toBeNull();
+      expect(outcome!.kind).toBe('solved');
+    }
+  });
+
+  it('points at two different cards when they have the same value', () => {
+    const model = modelWith([6, 6, 6, 6]);
+    const hint = model.useHint();
+    expect(hint).not.toBeNull();
+    expect(hint!.leftId).not.toBe(hint!.rightId);
+  });
+
+  it('works from the middle of a puzzle, including fractions', () => {
+    const model = modelWith([3, 3, 8, 8]);
+    combine(model, 2, '/', 1); // 8 ÷ 3 lands in slot 1
+    expect(values(model)).toEqual(['3', '8/3', '8']);
+
+    const hint = model.useHint();
+    expect(hint).not.toBeNull();
+    // From 3, 8/3, 8 the only way to 24 is 8 ÷ (3 − 8/3), so the next step is 3 − 8/3.
+    expect(valueOf(model, hint!.leftId)).toBe('3');
+    expect(hint!.op).toBe('-');
+    expect(valueOf(model, hint!.rightId)).toBe('8/3');
+  });
+
+  it('gives no hint when the cards left cannot make 24', () => {
+    const model = modelWith([6, 6, 6, 6]);
+    combine(model, 0, '*', 1);
+    combine(model, 1, '*', 2); // 216 and 6 left: no way to 24
+    expect(model.useHint()).toBeNull();
+    expect(model.hint).toBeNull();
+    expect(model.hintsUsed).toBe(0);
+  });
+
+  it('gives no hint once the puzzle is solved', () => {
+    const model = modelWith([6, 6, 6, 6]);
+    solveSixes(model);
+    expect(model.useHint()).toBeNull();
+  });
+
+  it('clears the selected card and operation so the hinted move starts fresh', () => {
+    const model = modelWith([4, 7, 8, 9]);
+    model.pickCard(idInSlot(model, 0));
+    model.pickOperation('+');
+    model.useHint();
+    expect(model.selectedId).toBeNull();
+    expect(model.pendingOp).toBeNull();
+  });
+
+  it('halves the coins (rounded down) when a hint was used', () => {
+    const normal = modelWith([6, 6, 6, 6]);
+    normal.useHint();
+    const normalOutcome = solveSixes(normal);
+    if (normalOutcome === null || normalOutcome.kind !== 'solved') {
+      throw new Error('Expected a solve');
+    }
+    expect(normalOutcome.result.coinsEarned).toBe(5); // 10 halved
+    expect(normalOutcome.result.hintsUsed).toBe(1);
+
+    const easy = modelWith([6, 6, 6, 6], { difficulty: 'easy' });
+    easy.useHint();
+    easy.useHint(); // more hints don't cost more
+    const easyOutcome = solveSixes(easy);
+    if (easyOutcome === null || easyOutcome.kind !== 'solved') {
+      throw new Error('Expected a solve');
+    }
+    expect(easyOutcome.result.coinsEarned).toBe(2); // 5 halved, rounded down
+    expect(easyOutcome.result.hintsUsed).toBe(2);
+  });
+
+  it('removes the hint after a move, undo or reset, but keeps counting hints used', () => {
+    // 6 + 6 keeps 6 6 6 6 solvable, so a hint is always available here.
+    const model = modelWith([6, 6, 6, 6]);
+    expect(model.useHint()).not.toBeNull();
+    combine(model, 0, '+', 1);
+    expect(model.hint).toBeNull();
+
+    expect(model.useHint()).not.toBeNull();
+    model.undo();
+    expect(model.hint).toBeNull();
+
+    combine(model, 0, '+', 1);
+    expect(model.useHint()).not.toBeNull();
+    model.reset();
+    expect(model.hint).toBeNull();
+    // Undo and Reset don't give the coins back.
+    expect(model.hintsUsed).toBe(3);
+  });
+
+  it('starts each new puzzle with no hint and no hints used', () => {
+    const model = modelWith([4, 7, 8, 9]);
+    model.useHint();
+    model.startPuzzle([6, 6, 6, 6]);
+    expect(model.hint).toBeNull();
+    expect(model.hintsUsed).toBe(0);
+  });
+});

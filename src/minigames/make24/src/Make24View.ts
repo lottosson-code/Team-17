@@ -103,7 +103,11 @@ export class Make24View {
     coinLine.hidden = result.coinsEarned === 0;
     this.find(`.${C}__result-coins span`).textContent = coinLabel(result.coinsEarned);
 
-    this.find(`.${C}__result-meta`).textContent = `Time ${formatTime(result.timeMs)} · Streak ${streak}`;
+    let meta = `Time ${formatTime(result.timeMs)} · Streak ${streak}`;
+    if (result.hintsUsed > 0) {
+      meta += ` · ${hintLabel(result.hintsUsed)}`;
+    }
+    this.find(`.${C}__result-meta`).textContent = meta;
   }
 
   showWinScreen(): void {
@@ -205,6 +209,13 @@ export class Make24View {
       button.disabled = !model.canPickOperation;
       button.setAttribute('aria-pressed', String(isChosen));
       button.classList.toggle('is-selected', isChosen);
+
+      // The operation the hint suggests glows, like the hinted cards.
+      let isHinted = false;
+      if (model.hint !== null) {
+        isHinted = button.dataset.op === model.hint.op;
+      }
+      button.classList.toggle('is-hinted', isHinted);
     }
 
     for (const button of Array.from(this.root.querySelectorAll<HTMLButtonElement>('[data-difficulty]'))) {
@@ -214,6 +225,7 @@ export class Make24View {
 
     this.find<HTMLButtonElement>('[data-action="undo"]').disabled = !model.canUndo;
     this.find<HTMLButtonElement>('[data-action="reset"]').disabled = !model.canUndo;
+    this.find<HTMLButtonElement>('[data-action="hint"]').disabled = model.solved;
   }
 
   private renderLog(model: Make24Model): void {
@@ -299,6 +311,8 @@ function panelHTML(target: number): string {
       <ol class="${C}__log" aria-label="Your steps"></ol>
       <p class="${C}__feedback" role="status" aria-live="polite"></p>
       <div class="${C}__actions">
+        <button type="button" data-action="hint"
+          title="Show a next step (halves this puzzle's coins)">Hint</button>
         <button type="button" data-action="undo">Undo</button>
         <button type="button" data-action="reset">Reset</button>
         <button type="button" data-action="skip">New puzzle</button>
@@ -328,6 +342,7 @@ function cardHTML(card: Card, model: Make24Model): string {
   const classes = [`${C}__card`];
   if (isSelected) classes.push('is-selected');
   if (card.id === model.freshId) classes.push('is-fresh');
+  if (isHintedCard(card, model)) classes.push('is-hinted');
   if (model.cards.length === 1) {
     // Last card left: green if it's the target, red if not.
     if (card.term.value.equals(model.target)) classes.push('is-win');
@@ -342,6 +357,14 @@ function cardHTML(card: Card, model: Make24Model): string {
       aria-pressed="${isSelected}" aria-label="Number ${spokenValue(card.term.value)}" ${disabled}>
       <span class="${C}__key" aria-hidden="true">${card.slot + 1}</span>${valueHTML(card.term.value)}
     </button>`;
+}
+
+/** True if the current hint points at this card. */
+function isHintedCard(card: Card, model: Make24Model): boolean {
+  if (model.hint === null) {
+    return false;
+  }
+  return card.id === model.hint.leftId || card.id === model.hint.rightId;
 }
 
 /** A card's number: a whole number, or a stacked fraction like ⁸⁄₃. */
@@ -375,6 +398,12 @@ function spokenValue(value: Fraction): string {
 function coinLabel(coins: number): string {
   if (coins === 1) return '+1 coin';
   return `+${coins} coins`;
+}
+
+/** "1 hint" or "2 hints". */
+function hintLabel(hints: number): string {
+  if (hints === 1) return '1 hint';
+  return `${hints} hints`;
 }
 
 /** Milliseconds as minutes:seconds, e.g. 65000 → "1:05". */

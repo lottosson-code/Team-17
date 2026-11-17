@@ -124,6 +124,7 @@ export function tutorialHTML(target: number): string {
         <ol class="${PREFIX}__tutorial-steps">${step1}${step2}${step3}${step4}</ol>
         <p class="${PREFIX}__tutorial-tip">
           Made a mistake? <b>Undo</b> goes back one step and <b>Reset</b> starts over.
+          Stuck? <b>Hint</b> shows a next step, but halves the coins for that puzzle.
         </p>
         <button type="button" class="${PREFIX}__primary" data-action="close-tutorial">
           Got it

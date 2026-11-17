@@ -47,6 +47,8 @@ export interface Make24Result {
   coinsEarned: number;
   /** Coin balance after this solve. */
   totalCoins: number;
+  /** How many hints the player used on this puzzle. */
+  hintsUsed: number;
 }
 
 /** What a coin reward function gets to decide the payout. */
@@ -76,6 +78,13 @@ export type MoveOutcome =
   | { kind: 'wrong-total'; value: Fraction }
   | { kind: 'solved'; result: Make24Result };
 
+/** A suggested next move: combine these two cards with this operation. */
+export interface Hint {
+  leftId: number;
+  op: Op;
+  rightId: number;
+}
+
 /** What the player walked away from when skipping an unsolved puzzle. */
 export interface SkippedPuzzle {
   numbers: number[];
@@ -103,6 +112,11 @@ export class Make24Model {
   /** The card made by the latest move, so the view can animate it. */
   freshId: number | null = null;
   solved = false;
+
+  /** The move the last hint suggested, or null if there's no hint showing. */
+  hint: Hint | null = null;
+  /** Hints used on the current puzzle. Any hint halves the coins for it. */
+  hintsUsed = 0;
 
   coins: number;
   solvedCount = 0;
@@ -188,6 +202,8 @@ export class Make24Model {
     this.clearSelection();
     this.freshId = null;
     this.solved = false;
+    this.hint = null;
+    this.hintsUsed = 0;
     this.startedAt = Date.now();
     // A puzzle dealt while the clock is paused starts paused at 0:00.
     if (this.pausedAt !== null) this.pausedAt = this.startedAt;
@@ -275,6 +291,42 @@ export class Make24Model {
     return true;
   }
 
+  // ---- hints -------------------------------------------------------------
+
+  /**
+   * Suggest a next move that can still reach the target from the cards on the
+   * table right now. Returns null if these cards can't make the target anymore
+   * (the player needs to Undo or Reset), or if there is no move left to make.
+   */
+  useHint(): Hint | null {
+    this.hint = null;
+
+    const values = this.cards.map((card) => card.term.value);
+    const solution = findSolution(values, this.target);
+    // No solution: it's a dead end. No steps: only one card is left (e.g. already solved).
+    if (solution === null || solution.steps.length === 0) {
+      return null;
+    }
+
+    // The solver works with values, so find the cards that have those values.
+    const firstStep = solution.steps[0];
+    const left = this.cards.find((card) => card.term.value.equals(firstStep.left));
+    // The right card must be a different card, even if it has the same value (like 6 and 6).
+    const right = this.cards.find((card) => {
+      return card !== left && card.term.value.equals(firstStep.right);
+    });
+    if (left === undefined || right === undefined) {
+      return null;
+    }
+
+    // Start the hinted move fresh, so an old selection doesn't get in the way.
+    this.clearSelection();
+    this.freshId = null;
+    this.hintsUsed += 1;
+    this.hint = { leftId: left.id, op: firstStep.op, rightId: right.id };
+    return this.hint;
+  }
+
   // ---- internals ---------------------------------------------------------
 
   /** Merge two cards into one, in the second card's spot. */
@@ -291,6 +343,8 @@ export class Make24Model {
 
     // Save the table as it is now, so Undo can come back to it.
     this.history.push({ cards: this.cards, steps: this.steps });
+    // The table is changing, so the old hint no longer applies.
+    this.hint = null;
 
     const merged = this.makeCard(right.slot, joinTerms(left.term, op, right.term, value));
     const untouched = this.cards.filter((card) => card !== left && card !== right);
@@ -318,7 +372,11 @@ export class Make24Model {
     this.solvedCount += 1;
     this.streak += 1;
 
-    const coinsEarned = this.coinsForThisSolve();
+    let coinsEarned = this.coinsForThisSolve();
+    // Using any hints halves the coins for this puzzle (rounded down).
+    if (this.hintsUsed > 0) {
+      coinsEarned = Math.floor(coinsEarned / 2);
+    }
     this.coins += coinsEarned;
 
     return {
@@ -330,6 +388,7 @@ export class Make24Model {
       timeMs: this.solveTimeMs,
       coinsEarned,
       totalCoins: this.coins,
+      hintsUsed: this.hintsUsed,
     };
   }
 
@@ -349,6 +408,7 @@ export class Make24Model {
     this.steps = snapshot.steps;
     this.clearSelection();
     this.freshId = null;
+    this.hint = null;
   }
 
   private makeCard(slot: number, term: Term): Card {
