@@ -28,6 +28,7 @@ export class BlacksmithController {
         this.view = view;
         this.callbacks = callbacks;
 
+        // observers
         this.view.onSelectDifficulty((difficulty: Difficulty) => {
             this.handleDifficultyChange(difficulty);
         });
@@ -89,6 +90,7 @@ export class BlacksmithController {
 
         if (result.isValid) {
             this.refreshView();
+            // emit stats upgraded event
             if (this.callbacks.onStatsUpgraded) {
                 this.callbacks.onStatsUpgraded(
                     this.model.getDefense(),
@@ -101,6 +103,7 @@ export class BlacksmithController {
     }
 
     public handleBackToMap(): void {
+        // emit exit to map event
         if (this.callbacks.onExitToMap) {
             this.callbacks.onExitToMap();
         }
