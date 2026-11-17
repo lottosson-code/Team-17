@@ -294,3 +294,39 @@ describe('leaving a puzzle and changing difficulty', () => {
     expect(() => model.setDifficulty('expert' as never)).toThrow(RangeError);
   });
 });
+
+describe('pausing the clock', () => {
+  it('does not count time while paused', () => {
+    const model = modelWith([4, 7, 8, 9]);
+    vi.advanceTimersByTime(2_000);
+    model.pauseClock();
+    vi.advanceTimersByTime(30_000);
+    expect(model.elapsedMs()).toBe(2_000);
+
+    model.resumeClock();
+    vi.advanceTimersByTime(1_000);
+    expect(model.elapsedMs()).toBe(3_000);
+  });
+
+  it('ignores a second pause or a resume without a pause', () => {
+    const model = modelWith([4, 7, 8, 9]);
+    model.resumeClock(); // nothing to resume
+    model.pauseClock();
+    vi.advanceTimersByTime(5_000);
+    model.pauseClock(); // already paused: must not move the pause point
+    model.resumeClock();
+    expect(model.elapsedMs()).toBe(0);
+  });
+
+  it('starts a puzzle dealt while paused at 0:00', () => {
+    const model = modelWith([4, 7, 8, 9]);
+    model.pauseClock();
+    vi.advanceTimersByTime(5_000);
+    model.startPuzzle([6, 6, 6, 6]);
+    vi.advanceTimersByTime(5_000);
+    expect(model.elapsedMs()).toBe(0);
+    model.resumeClock();
+    vi.advanceTimersByTime(1_000);
+    expect(model.elapsedMs()).toBe(1_000);
+  });
+});
