@@ -24,6 +24,8 @@ export interface EnemyKind {
     attackDamage: number;
     attackIntervalMs: number; // Delay between attacks
     ownProblems?: () => ProblemSource; // Gives each enemy of this kind its own fresh source, e.g. a times table
+    // When defeated, splits and becomes `count` enemies of kind `into` where it stood, like a slime.
+    split?: { into: string; count: number };
 }
 
 // A scripted pause after a group's enemies appear. The scene plays the animation for "id",
@@ -98,6 +100,7 @@ export type CombatEvent =
     | { type: 'cutsceneEnded'; id: string }
     | { type: 'hit'; enemyId: number; damage: number }
     | { type: 'newProblem'; enemyId: number }
+    | { type: 'enemySplit'; enemyId: number; into: number[] } // Sent before its 'enemyDefeated'; `into` = the new enemies' ids
     | { type: 'enemyDefeated'; enemyId: number }
     | { type: 'wrongAnswer'; answer: number }
     | { type: 'enemyReachedPlayer'; enemyId: number }
