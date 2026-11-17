@@ -373,6 +373,23 @@ function validateLevel(level: LevelSpec): void {
         if (kind.maxHp <= 0 || kind.walkMs <= 0 || kind.attackIntervalMs <= 0) {
             throw new Error(`Enemy kind "${id}" needs positive maxHp, walkMs and attackIntervalMs`);
         }
+        if (kind.split) {
+            const { into, count } = kind.split;
+            if (!level.enemyKinds[into]) throw new Error(`Enemy kind "${id}" splits into unknown kind "${into}"`);
+            if (!Number.isInteger(count) || count < 1 || count > LANE_COUNT) {
+                throw new Error(`Enemy kind "${id}" must split into 1-${LANE_COUNT} enemies`);
+            }
+        }
+    }
+    // Every split chain must end, or the level could never be won (and counting enemies would never finish).
+    for (const id of Object.keys(level.enemyKinds)) {
+        const chain: string[] = [];
+        let at: string | undefined = id;
+        while (at !== undefined) {
+            if (chain.includes(at)) throw new Error(`Enemy kind "${id}" splits forever: ${[...chain, at].join(' -> ')}`);
+            chain.push(at);
+            at = level.enemyKinds[at].split?.into;
+        }
     }
     level.groups.forEach((group, g) => {
         if (group.enemies.length === 0) throw new Error(`Group ${g} has no enemies`);
