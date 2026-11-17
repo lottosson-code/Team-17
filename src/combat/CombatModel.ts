@@ -11,10 +11,14 @@ import {
     type LevelSpec,
     type ProblemSource,
     type SpawnGroup,
+    type PowerUpKind,
 } from './types';
 
 /** A lane can take a new enemy once the last one in it has walked this far (0-1). */
 export const SPAWN_CLEARANCE = 0.12;
+
+/** Default spawn order of power ups */
+export const DEFAULT_POWER_UP_REWARDS: PowerUpKind[] = ['freeze', 'heal', 'zap'];
 
 /**
  * The rules of one combat level, with no Phaser or DOM code.
@@ -52,6 +56,11 @@ export class CombatModel {
     private activeCutscene: CutsceneSpec | undefined;
     private walkInDone = false;
 
+    private inventory: PowerUpKind[] = [];
+    private streak = 0; 
+    private rewardsGiven = 0;
+    private freezeRemainingMs = 0;
+
     /** Events produced outside tick/submit, delivered on the next tick. */
     private pending: CombatEvent[] = [];
 
@@ -75,6 +84,13 @@ export class CombatModel {
             return events;
         }
 
+        // A freeze stops enemies and spawning; only the freeze timer runs.
+        if (this.freezeRemainingMs > 0) {
+            this.freezeRemainingMs = Math.max(0, this.freezeRemainingMs - dtMs);
+            if (this.freezeRemainingMs == 0) events.push({ type: 'powerUpExpired', kind: 'freeze' });
+            return events;
+        }
+
         // Move existing enemies before spawning, so new ones start at progress 0.
         for (const enemy of this.enemies) {
             this.advanceEnemy(enemy, dtMs, events);
@@ -94,6 +110,7 @@ export class CombatModel {
 
         const target = this.enemies.find(enemy => enemy.problem.answer === answer);
         if (!target) {
+            this.streak = 0;
             this.missedCount++;
             return [{ type: 'wrongAnswer', answer }];
         }
@@ -116,6 +133,45 @@ export class CombatModel {
             target.problem = this.createProblem(target.problems);
             events.push({ type: 'newProblem', enemyId: target.id });
         }
+        this.powerUpsCorrectAnswer(events);
+        return events;
+    }
+
+    /**
+     * Uses a power up from the inventory. If a power up cannot be used, return;
+     */
+    public usePowerUp(): CombatEvent[] {
+        const powers = this.level.powerUps;
+        if (!powers || this.status != 'playing') return [];
+        // Only the first power-up in the inventory can be used.
+        if (this.inventory.length < 1) return [];
+        const kind: PowerUpKind = this.inventory[0];
+
+        const events: CombatEvent[] = [];
+        switch (kind) {
+            case 'freeze':
+                if (this.freezeRemainingMs > 0) return [];
+                this.freezeRemainingMs = powers.freezeMs;
+                events.push({ type: 'powerUpUsed', kind });
+                break;
+            case 'heal':
+                if (this.playerHp >= this.level.playerMaxHp) return [];
+                this.playerHp = Math.min(this.level.playerMaxHp, this.playerHp + powers.healAmount);
+                events.push({ type: 'powerUpUsed', kind });
+                break;
+            case 'zap': {
+                // Defeats the enemy closest to the wizard, whatever its problem.
+                const target = this.frontMostEnemy();
+                if (!target) return [];
+                events.push({ type: 'powerUpUsed', kind, enemyId: target.id });
+                this.enemies = this.enemies.filter(enemy => enemy !== target);
+                this.defeatedCount++;
+                events.push({ type: 'enemyDefeated', enemyId: target.id });
+                this.checkWon(events);
+                break;
+            }
+        }
+        this.inventory.shift();
         return events;
     }
 
@@ -201,6 +257,21 @@ export class CombatModel {
             before += countEnemies(group, this.level.enemyKinds);
         }
         return markers;
+    }
+
+    /** Power-ups the player holds */
+    public getInventory(): readonly PowerUpKind[] {
+        return this.inventory;
+    }
+
+    /** Correct answers in a row */
+    public getStreak(): number {
+        return this.streak;
+    }
+
+    /** Time left on a freeze; 0 when enemies aren't frozen. */
+    public getFreezeRemainingMs(): number {
+        return this.freezeRemainingMs;
     }
 
     private isOver(): boolean {
@@ -398,6 +469,31 @@ export class CombatModel {
             throw new Error(`Problem source returned duplicate answer ${problem.answer}`);
         }
         return problem;
+    }
+
+    /** Counts a correct answer toward the streak and awards a power-up when it is reached. */
+    private powerUpsCorrectAnswer(events: CombatEvent[]): void {
+        const powers = this.level.powerUps;
+        if (!powers) return;
+        this.streak++;
+        if (this.streak < powers.streakToEarn) return;
+        // Inventory full: the streak is kept, so the next correct answer earns one once there's room.
+        if (this.inventory.length >= powers.maxInventory) return;
+        this.streak = 0;
+        const rewards = powers.rewards ?? DEFAULT_POWER_UP_REWARDS;
+        const kind = rewards[this.rewardsGiven % rewards.length];
+        this.rewardsGiven++;
+        this.inventory.push(kind);
+        events.push({ type: 'powerUpEarned', kind });
+    }
+
+    /** The enemy closest to the wizard (the first one if several are tied). */
+    private frontMostEnemy(): Enemy | undefined {
+        let front: Enemy | undefined;
+        for (const enemy of this.enemies) {
+            if (!front || enemy.progress > front.progress) front = enemy;
+        }
+        return front;
     }
 }
 
