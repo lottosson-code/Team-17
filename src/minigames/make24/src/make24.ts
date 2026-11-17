@@ -18,8 +18,12 @@ import type { Difficulty, Op } from './logic';
 import { Make24Model } from './Make24Model';
 import type { CoinReward, Make24Result, MoveOutcome } from './Make24Model';
 import { Make24View } from './Make24View';
+import { browserStorage, rememberTutorialSeen, shouldShowTutorialAtStart } from './tutorial';
+import type { TutorialMode, TutorialStorage } from './tutorial';
 
 export type { Difficulty, Op, Step } from './logic';
+export { TUTORIAL_SEEN_KEY } from './tutorial';
+export type { TutorialMode, TutorialStorage } from './tutorial';
 export { DEFAULT_COIN_REWARD } from './Make24Model';
 export type { CoinRewardInfo, Make24Result } from './Make24Model';
 
@@ -37,8 +41,15 @@ export interface Make24Options {
   exitLabel?: string;
   /** Show the Easy / Normal / Hard switch. Defaults to true. */
   showDifficulty?: boolean;
-  /** Keyboard shortcuts (1–4, + − * /, Backspace, R, N, Esc). Defaults to true. */
+  /** Keyboard shortcuts (1–4, + − * /, Backspace, R, N, ?, Esc). Defaults to true. */
   keyboard?: boolean;
+  /**
+   * When the how-to-play card opens by itself. 'first-time' (default): the first time
+   * on this device. 'always': every time the game opens. 'never': only from the ? button.
+   */
+  tutorial?: TutorialMode;
+  /** Where "seen the how-to-play card" is remembered. Defaults to the browser's localStorage. */
+  tutorialStorage?: TutorialStorage;
   /** Player's coin balance when the minigame opens (e.g. from their save). Defaults to 0. */
   coins?: number;
   /** Coins per solve: a fixed number, or a function. Defaults to Easy 5 / Normal 10 / Hard 15. */
@@ -58,6 +69,8 @@ export interface Make24Controller {
   getCoins(): number;
   /** Overwrite the displayed balance, e.g. after the player spends coins elsewhere. */
   setCoins(coins: number): void;
+  /** Open the how-to-play card. */
+  showTutorial(): void;
   /** Stop timers, remove listeners and remove the game from the page. */
   destroy(): void;
 }
@@ -200,10 +213,36 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
     view.render(model);
   }
 
+  /** Open the how-to-play card. The clock pauses so reading it doesn't count as playing time. */
+  function openTutorial(): void {
+    if (view.isTutorialShown) return;
+    model.pauseClock();
+    view.showTutorial();
+  }
+
+  function closeTutorial(): void {
+    if (!view.isTutorialShown) return;
+    model.resumeClock();
+    view.hideTutorial();
+    view.renderTime(model);
+    rememberTutorialSeen(tutorialStorage());
+  }
+
+  function tutorialStorage(): TutorialStorage | undefined {
+    if (options.tutorialStorage) return options.tutorialStorage;
+    return browserStorage();
+  }
+
   // ---- clicks -------------------------------------------------------------
   // One listener for the whole game: each button says what it does in a data- attribute.
 
   function handleClick(event: MouseEvent): void {
+    // Clicking the dark area around the how-to-play card closes it.
+    if (view.isTutorialBackdrop(event.target)) {
+      closeTutorial();
+      return;
+    }
+
     const button = clickedButton(event.target);
     if (button === null) return;
 
@@ -236,6 +275,12 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
       case 'exit':
         exitGame();
         break;
+      case 'help':
+        openTutorial();
+        break;
+      case 'close-tutorial':
+        closeTutorial();
+        break;
     }
   }
 
@@ -247,10 +292,18 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
     if (isTypingInAField(event.target)) return;
 
     let handled: boolean;
-    if (view.isWinScreenShown) handled = handleWinScreenKey(event.key);
+    if (view.isTutorialShown) handled = handleTutorialKey(event.key);
+    else if (view.isWinScreenShown) handled = handleWinScreenKey(event.key);
     else handled = handleGameKey(event.key);
 
     if (handled) event.preventDefault();
+  }
+
+  /** While the card is open only Esc works; Enter and Space press its focused "Got it" button. */
+  function handleTutorialKey(key: string): boolean {
+    if (key !== 'Escape') return false;
+    closeTutorial();
+    return true;
   }
 
   /** Returns true if the key did something. */
@@ -282,6 +335,7 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
     if (key === 'Backspace' || key === 'u' || key === 'U') undo();
     else if (key === 'r' || key === 'R') reset();
     else if (key === 'n' || key === 'N') skipPuzzle();
+    else if (key === '?') openTutorial();
     else if (key === 'Escape') clearSelection();
     else return false;
     return true;
@@ -297,6 +351,15 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
   const timerId = window.setInterval(() => {
     if (!model.solved) view.renderTime(model);
   }, TIMER_UPDATE_MS);
+
+  // Show the how-to-play card at the start if the tutorial option says so.
+  let tutorialMode: TutorialMode = 'first-time';
+  if (options.tutorial !== undefined) {
+    tutorialMode = options.tutorial;
+  }
+  if (shouldShowTutorialAtStart(tutorialMode, tutorialStorage())) {
+    openTutorial();
+  }
 
   // ---- what the rest of the game can call ----------------------------------
 
@@ -314,6 +377,7 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
       model.setCoins(coins);
       view.renderStats(model);
     },
+    showTutorial: openTutorial,
     destroy() {
       window.clearInterval(timerId);
       document.removeEventListener('keydown', handleKey);

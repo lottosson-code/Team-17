@@ -114,6 +114,8 @@ export class Make24Model {
   private lastPuzzleKey = '';
   private startedAt = 0;
   private solveTimeMs = 0;
+  /** When the clock was paused, or null while it's running. */
+  private pausedAt: number | null = null;
 
   constructor(settings: ModelSettings) {
     this.target = settings.target;
@@ -142,10 +144,24 @@ export class Make24Model {
     return this.cards.find((card) => card.slot === slot);
   }
 
-  /** Time spent on the current puzzle. Stops counting once it's solved. */
+  /** Time spent on the current puzzle. Stops counting once it's solved, and while paused. */
   elapsedMs(): number {
     if (this.solved) return this.solveTimeMs;
+    if (this.pausedAt !== null) return this.pausedAt - this.startedAt;
     return Date.now() - this.startedAt;
+  }
+
+  // ---- pausing the clock (e.g. while the how-to-play card is open) --------
+
+  pauseClock(): void {
+    if (this.pausedAt === null) this.pausedAt = Date.now();
+  }
+
+  resumeClock(): void {
+    if (this.pausedAt === null) return;
+    // Move the start forward by however long the clock was paused, so that time doesn't count.
+    this.startedAt += Date.now() - this.pausedAt;
+    this.pausedAt = null;
   }
 
   // ---- starting puzzles --------------------------------------------------
@@ -173,6 +189,8 @@ export class Make24Model {
     this.freshId = null;
     this.solved = false;
     this.startedAt = Date.now();
+    // A puzzle dealt while the clock is paused starts paused at 0:00.
+    if (this.pausedAt !== null) this.pausedAt = this.startedAt;
   }
 
   /**

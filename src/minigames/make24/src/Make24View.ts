@@ -8,6 +8,7 @@ import { DIFFICULTIES, OPS, OP_NAME, OP_SYMBOL, stepText } from './logic';
 import type { Difficulty, Fraction } from './logic';
 import { CARD_COUNT } from './Make24Model';
 import type { Card, Make24Model, Make24Result } from './Make24Model';
+import { helpButtonHTML, tutorialHTML } from './tutorial';
 
 /** Every class name starts with this, so nothing clashes with the rest of the game. */
 const C = 'cse-make24';
@@ -32,6 +33,7 @@ export class Make24View {
   private readonly logEl: HTMLElement;
   private readonly feedbackEl: HTMLElement;
   private readonly winScreenEl: HTMLElement;
+  private readonly tutorialEl: HTMLElement;
   private readonly coinsEl: HTMLElement;
   private readonly solvedEl: HTMLElement;
   private readonly streakEl: HTMLElement;
@@ -47,6 +49,7 @@ export class Make24View {
     this.logEl = this.find(`.${C}__log`);
     this.feedbackEl = this.find(`.${C}__feedback`);
     this.winScreenEl = this.find(`.${C}__overlay`);
+    this.tutorialEl = this.find(`.${C}__tutorial`);
     this.coinsEl = this.find('[data-stat="coins"]');
     this.solvedEl = this.find('[data-stat="solved"]');
     this.streakEl = this.find('[data-stat="streak"]');
@@ -114,6 +117,27 @@ export class Make24View {
 
   get isWinScreenShown(): boolean {
     return !this.winScreenEl.hidden;
+  }
+
+  // ---- how-to-play card --------------------------------------------------
+
+  showTutorial(): void {
+    this.tutorialEl.hidden = false;
+    this.find<HTMLButtonElement>('[data-action="close-tutorial"]').focus();
+  }
+
+  hideTutorial(): void {
+    this.tutorialEl.hidden = true;
+    this.find<HTMLButtonElement>('[data-action="help"]').focus();
+  }
+
+  get isTutorialShown(): boolean {
+    return !this.tutorialEl.hidden;
+  }
+
+  /** True if a click landed on the dark area around the card (not on the card itself). */
+  isTutorialBackdrop(target: EventTarget | null): boolean {
+    return target === this.tutorialEl;
   }
 
   /** False when the game is hidden or not on the page, so keys shouldn't control it. */
@@ -222,6 +246,7 @@ function layoutHTML(target: number, hasBackground: boolean): string {
   html += statsHTML();
   html += panelHTML(target);
   html += winScreenHTML(target);
+  html += tutorialHTML(target);
   return html;
 }
 
@@ -262,7 +287,12 @@ function panelHTML(target: number): string {
     <div class="${C}__panel">
       <div class="${C}__header">
         <p class="${C}__prompt">Use all four numbers once with + − × ÷ to make <b>${target}</b>.</p>
-        <div class="${C}__difficulty" role="group" aria-label="Difficulty">${difficultyButtons}</div>
+        <div class="${C}__tools">
+          <div class="${C}__difficulty" role="group" aria-label="Difficulty">
+            ${difficultyButtons}
+          </div>
+          ${helpButtonHTML()}
+        </div>
       </div>
       <div class="${C}__cards" role="group" aria-label="Number cards"></div>
       <div class="${C}__ops" role="group" aria-label="Operations">${operationButtons}</div>
