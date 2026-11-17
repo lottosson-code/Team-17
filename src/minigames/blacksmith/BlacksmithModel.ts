@@ -6,6 +6,7 @@ export interface ForgeItem {
     id: ItemId;
     label: string;
     placeholderIcon: string;
+    imagePath: string;
 }
 
 export interface ForgeEquation {
@@ -31,9 +32,24 @@ export interface ValidationResult {
 }
 
 export const FORGE_ITEMS: ForgeItem[] = [
-    { id: 'feather', label: 'Feather', placeholderIcon: '[Feather]' },
-    { id: 'potion', label: 'Potion', placeholderIcon: '[Potion]' },
-    { id: 'ingot', label: 'Iron Ingot', placeholderIcon: '[Ingot]' },
+    {
+        id: 'feather',
+        label: 'Feather',
+        placeholderIcon: '[Feather]',
+        imagePath: '/assets/blacksmith/feather.png',
+    },
+    {
+        id: 'potion',
+        label: 'Potion',
+        placeholderIcon: '[Potion]',
+        imagePath: '/assets/blacksmith/potion.png',
+    },
+    {
+        id: 'ingot',
+        label: 'Iron Ingot',
+        placeholderIcon: '[Ingot]',
+        imagePath: '/assets/blacksmith/ingot.png',
+    },
 ];
 
 const DIFFICULTY_RULES: Record<
