@@ -86,6 +86,11 @@
   border: .1cqw solid var(--menu-frame-color);
   box-shadow: 0 .3cqw 1cqw #221d1866;
 }
+/* One button hidden (Continue before any save): shrink the panel by one row, so the other three keep their size.
+   24.6% = the normal 32% height minus one button and one gap. */
+.cse-main-menu__panel:has(> .cse-main-menu__button[hidden]) { height: 24.6%; }
+/* Remove a hidden button from the layout completely. */
+.cse-main-menu__button[hidden] { display: none; }
 .cse-main-menu__button,
 .cse-main-menu__map {
   appearance: none;

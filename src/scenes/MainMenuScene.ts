@@ -6,6 +6,9 @@ import { createSettingsModal, SettingsModalController } from '../ui/settingsModa
 import { createQuitModal, QuitModalController } from '../ui/quitModal';
 import { soundManager } from '../audio/soundManager';
 import { mapProgressStore } from '../state/mapProgressStore';
+// Remembers the last level played, for the Continue button.
+import { clearLastPlayed, loadLastPlayed, saveLastPlayed } from '../ui/lastPlayed';
+import type { LevelSelection } from '../../map/types.js';
 import '../ui/modal.css';
 
 export interface MainMenuSceneData {
@@ -61,15 +64,28 @@ export class MainMenuScene extends Phaser.Scene {
       menu: {
         // Read fresh progress whenever this scene starts.
         progress: currentProgress(),
+        // Checked each time the menu opens: no saved level (first time playing) hides Continue.
+        hidden: { continue: loadLastPlayed() === null },
         callbacks: {
           newGame: ({ menu }) => {
             soundManager.playSfx('click');
             mapProgressStore.resetProgress();
+            // A new game has no level to continue: forget it and hide Continue.
+            clearLastPlayed();
+            menu?.update({ hidden: { continue: true } });
             // Redraw after the reset (`?.`: tests call this without a menu).
             menu?.update({ progress: currentProgress() });
             ui.showMap();
           },
           continue: () => {
+            // Continue: reopen the level the player started most recently, from its beginning.
+            const lastPlayed = loadLastPlayed();
+            if (lastPlayed) {
+              // Same path as clicking that level on the map.
+              this.startLevel(lastPlayed);
+              return;
+            }
+            // No saved level (the button is normally hidden then): just open the map.
             soundManager.playSfx('click');
             ui.showMap();
           },
@@ -128,22 +144,8 @@ export class MainMenuScene extends Phaser.Scene {
           },
         },
       },
-      onLevelSelect: (selection) => {
-        soundManager.playSfx('start');
-        soundManager.stopMenuMusic();
-        const gameplay = toGameplaySelection(selection);
-        if (gameplay.activity === 'minigame') {
-          if (gameplay.levelId === 1) {
-            this.scene.start('Make24', { moduleId: gameplay.moduleId, levelId: 6 });
-            return;
-          }
-          if (gameplay.levelId === 2) {
-            this.scene.start('Blacksmith', { moduleId: gameplay.moduleId, levelId: 7 });
-            return;
-          }
-        }
-        this.scene.start('Combat', gameplay);
-      },
+      // Map click: open the level (shared with Continue, see startLevel below).
+      onLevelSelect: (selection) => this.startLevel(selection),
     });
 
     this.ui = ui;
@@ -171,5 +173,29 @@ export class MainMenuScene extends Phaser.Scene {
       host.destroy();
       soundManager.stopMenuMusic();
     });
+  }
+
+  /**
+   * Opens a level's gameplay scene and remembers it as the last level played.
+   * Used by both the map (clicking a level) and the Continue button.
+   */
+  private startLevel(selection: LevelSelection): void {
+    // Save first, so the level is already stored however the player later leaves
+    // (pause menu, closing the browser, ...), and Continue can reopen it.
+    saveLastPlayed(selection);
+    soundManager.playSfx('start');
+    soundManager.stopMenuMusic();
+    const gameplay = toGameplaySelection(selection);
+    if (gameplay.activity === 'minigame') {
+      if (gameplay.levelId === 1) {
+        this.scene.start('Make24', { moduleId: gameplay.moduleId, levelId: 6 });
+        return;
+      }
+      if (gameplay.levelId === 2) {
+        this.scene.start('Blacksmith', { moduleId: gameplay.moduleId, levelId: 7 });
+        return;
+      }
+    }
+    this.scene.start('Combat', gameplay);
   }
 }
