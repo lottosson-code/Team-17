@@ -241,7 +241,7 @@ export class CombatScene extends Phaser.Scene {
     }
     soundManager.playSfx('start');
     mapProgressStore.completeLevel(this.moduleId, this.levelId);
-    this.hud.showOverlay('won');
+    this.hud.showOverlay('won', this.model.getStats());
   }
 
   private restart(): void {
@@ -296,11 +296,11 @@ export class CombatScene extends Phaser.Scene {
           break;
         case 'won':
           mapProgressStore.completeLevel(this.moduleId, this.levelId);
-          this.hud.showOverlay('won');
+          this.hud.showOverlay('won', this.model.getStats());
           break;
         case 'lost':
           this.wizard.defeat();
-          this.hud.showOverlay('lost');
+          this.hud.showOverlay('lost', this.model.getStats());
           break;
         // enemySpawned / enemySplit / newProblem / enemyReachedPlayer / cutsceneEnded: update() picks these up.
         // (A split's new enemies get sprites in update(), where the parent stood; its death plays on 'enemyDefeated'.)

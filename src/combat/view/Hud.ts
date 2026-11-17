@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { heartFills } from './hudLogic';
+import type { CombatStats } from '../types';
+import { heartFills, statLines } from './hudLogic';
 import { DEPTH } from './theme';
 import { TEX } from './textures';
 
@@ -238,19 +239,24 @@ export class Hud {
         this.scene.tweens.add({ targets: this.banner, alpha: 0, delay: holdMs, duration: 400 });
     }
 
-    /** Pause menu or end-of-level panel, with buttons. Pass undefined to close it. */
-    showOverlay(kind: 'paused' | 'won' | 'lost' | undefined): void {
+    /**
+     * Pause menu or end-of-level panel, with buttons. Pass undefined to close it.
+     * With `stats`, the panel also shows the level's statistics between the title and the buttons.
+     */
+    showOverlay(kind: 'paused' | 'won' | 'lost' | undefined, stats?: CombatStats): void {
         this.overlay?.destroy();
         this.overlay = undefined;
         if (!kind) return;
 
         const add = this.scene.add;
+        // The statistics row pushes the title up and the buttons down to make room.
+        const layout = stats ? { title: 268, buttons: 428, hint: 484 } : { title: 290, buttons: 410, hint: 470 };
         const dim = add.rectangle(640, 360, 1280, 720, 0x05020c, 0.6).setInteractive();
         const box = add.graphics();
         bannerShape(box, 640, 210, 560, 300);
         const titles = { paused: 'PAUSED', won: 'VICTORY!', lost: 'DEFEATED' };
         const colors = { paused: '#f3e6c4', won: '#ffd76a', lost: '#ff6b7a' };
-        const title = add.text(640, 290, titles[kind], {
+        const title = add.text(640, layout.title, titles[kind], {
             fontFamily: 'Lora', fontSize: '54px', fontStyle: 'bold', color: colors[kind], stroke: '#140818', strokeThickness: 8,
         }).setOrigin(0.5);
         const buttons = kind === 'paused'
@@ -259,11 +265,27 @@ export class Hud {
         const spacing = 190;
         const first = 640 - ((buttons.length - 1) * spacing) / 2;
         const items: Phaser.GameObjects.GameObject[] = [dim, box, title];
-        buttons.forEach(([label, action], i) => items.push(menuButton(this.scene, first + i * spacing, 410, label, action)));
+        if (stats) items.push(...this.statColumns(stats));
+        buttons.forEach(([label, action], i) => items.push(menuButton(this.scene, first + i * spacing, layout.buttons, label, action)));
         const hint = kind === 'paused' ? 'Esc to resume' : 'R to restart  ·  M for map';
-        items.push(add.text(640, 470, hint, { fontFamily: 'Lora', fontSize: '16px', color: '#a99ccc' }).setOrigin(0.5));
+        items.push(add.text(640, layout.hint, hint, { fontFamily: 'Lora', fontSize: '16px', color: '#a99ccc' }).setOrigin(0.5));
 
         this.overlay = add.container(0, 0, items).setDepth(DEPTH.overlay).setAlpha(1);
+    }
+
+    /** The end screen's statistics: a row of columns, each a large value over a small label. */
+    private statColumns(stats: CombatStats): Phaser.GameObjects.Text[] {
+        const lines = statLines(stats);
+        const spacing = 150;
+        const first = 640 - ((lines.length - 1) * spacing) / 2;
+        return lines.flatMap(({ label, value }, i) => [
+            this.scene.add.text(first + i * spacing, 336, value, {
+                fontFamily: 'Poppins', fontSize: '30px', color: CREAM,
+            }).setOrigin(0.5),
+            this.scene.add.text(first + i * spacing, 368, label.toUpperCase(), {
+                fontFamily: 'Lora', fontSize: '14px', fontStyle: 'bold', color: '#a99ccc',
+            }).setOrigin(0.5),
+        ]);
     }
 
     private drawInputFrame(): void {
