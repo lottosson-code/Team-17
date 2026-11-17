@@ -86,6 +86,13 @@ export interface Enemy {
 
 export type CombatStatus = 'playing' | 'cutscene' | 'won' | 'lost';
 
+/** How the player answered during a level, for the end screen. */
+export interface CombatStats {
+    solved: number; // Correct answers (each one a spell that hit)
+    missed: number; // Wrong answers
+    accuracy: number | null; // solved / (solved + missed), 0-1; null before the first answer
+}
+
 /**
  * Everything the view needs to animate. The model never plays animations itself;
  * the scene reacts to these (e.g. `wrongAnswer` -> wizard's frustrated animation).
