@@ -60,12 +60,23 @@ export interface SpawnGroup {
     announce?: string; // Banner text when the group starts
 }
 
+export type PowerUpKind = 'freeze' | 'heal' | 'zap';
+
+export interface PowerUpConfig {
+    streakToEarn: number;
+    maxInventory: number;
+    freezeMs: number;
+    healAmount: number;
+    rewards?: PowerUpKind[]; // Order earned power-ups come in, repeating (default: freeze, heal, zap)
+}
+
 export interface LevelSpec {
     playerMaxHp: number;
     damagePerHit: number;
     problems: ProblemSource; // Default problems for every group
     enemyKinds: Record<string, EnemyKind>;
     groups: SpawnGroup[];
+    powerUps?: PowerUpConfig;
 }
 
 export type EnemyState = 'walking' | 'attacking';
@@ -102,5 +113,8 @@ export type CombatEvent =
     | { type: 'wrongAnswer'; answer: number }
     | { type: 'enemyReachedPlayer'; enemyId: number }
     | { type: 'playerDamaged'; enemyId: number; damage: number }
+    | { type: 'powerUpEarned'; kind: PowerUpKind }
+    | { type: 'powerUpUsed'; kind: PowerUpKind; enemyId?: number }
+    | { type: 'powerUpExpired'; kind: PowerUpKind }
     | { type: 'won' }
     | { type: 'lost' };

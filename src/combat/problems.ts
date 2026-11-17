@@ -13,7 +13,7 @@ export function compute(left: number, operator: Operator, right: number): number
         case '*': return left * right;
         case '/': return left / right;
         case '%': return left % right;
-        case '//': return left / right;
+        case '//': return Math.floor(left / right);
     }
 }
 
@@ -54,6 +54,7 @@ export function createZeroProblems(max = 11, rng: () => number = Math.random): P
         return rng() < 0.5 ? makeProblem(0, '*', other) : makeProblem(other, '*', 0);
     };
 }
+
 // Modulus where max is the maximum multiplier used when generating random numbers
 // maxAnswer must be less than max or an error will be thrown.
 export function createRemainderProblems(maxAnswer = 10, max = 12, 

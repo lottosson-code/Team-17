@@ -8,6 +8,8 @@ import {
     createZeroProblems,
     makeProblem,
     problemText,
+    createFloorProblem,
+    createRemainderProblems
 } from '../combat/problems';
 import type { CombatProblem, ProblemSource } from '../combat/types';
 
@@ -112,4 +114,29 @@ describe('problem sources', () => {
         const live = [makeProblem(2, '+', 3), makeProblem(3, '*', 3)];
         expect(next(new Set(live.map(p => p.answer)), live)).toEqual(makeProblem(2, '+', 2));
     });
+
+    test('floor/integer division problem with maxAnswers = 20 and max = 12', () => {
+        const prob = createFloorProblem(20, 12);
+        for (let i = 0; i < 30; i++) {
+            const p = prob(new Set(), []);
+            expect(p.operator).toBe('//');
+            expect(Math.floor(p.left / p.right)).toBe(p.answer);
+            expect(p.answer).toBeLessThanOrEqual(20);
+            expect(p.right).toBeGreaterThanOrEqual(1);
+            expect(p.right).toBeLessThanOrEqual(12);
+        }
+    });
+
+    test('Remainder Problem with ', () => {
+        const next = createRemainderProblems(10, 12);
+        for (let i = 0; i < 30; i++) {
+            const p = next(new Set(), []);
+            expect(p.operator).toBe('%');
+            expect(p.left % p.right).toBe(p.answer);
+            expect(p.answer).toBeLessThanOrEqual(10);
+            expect(p.right).toBeGreaterThan(p.answer);
+            expect(p.right).toBeLessThanOrEqual(12);
+        }
+    });
+
 });

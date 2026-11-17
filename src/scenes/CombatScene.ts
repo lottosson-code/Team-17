@@ -198,7 +198,15 @@ export class CombatScene extends Phaser.Scene {
       this.typed = this.typed.slice(0, -1);
     } else if (event.key === 'Enter') {
       this.cast();
+    } else if (event.key === 'q' || event.key == 'Q') {
+      this.usePowerUp();
     }
+  }
+
+  /** Uses the first power-up in the inventory, if there is one. */
+  private usePowerUp(): void {
+    if (this.paused) return;
+    this.handleEvents(this.model.usePowerUp());
   }
 
   private cast(): void {

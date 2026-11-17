@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { CombatModel, SPAWN_CLEARANCE } from '../combat/CombatModel';
 import { createAdditionProblems, createTwistableProblems, createMultiplicationProblems, makeProblem } from '../combat/problems';
 import { MODULE1_LEVEL1, MODULE1_LEVEL2 } from '../combat/levels';
-import type { CombatEvent, CombatProblem, LevelSpec, ProblemSource, SpawnGroup } from '../combat/types';
+import type { CombatEvent, CombatProblem, LevelSpec, ProblemSource, SpawnGroup, PowerUpKind } from '../combat/types';
 
 /** Predictable answers 1, 2, 3, ... skipping any answer already on screen. */
 function countingProblems(): ProblemSource {
@@ -573,6 +573,70 @@ describe('MODULE1_LEVEL2', () => {
             expect(events).toContain(step < 16 ? 'newProblem' : 'enemyDefeated');
         }
         expect(model.getStatus()).toBe('won');
+    });
+});
+
+describe('power-ups', () => {
+    // Four slow enemies, so the level keeps going after one is defeated.
+    function powerUpLevel(rewards: PowerUpKind[], streakToEarn = 1): LevelSpec {
+        return level({
+            powerUps: { streakToEarn, maxInventory: 3, freezeMs: 2000, healAmount: 10, rewards },
+            enemyKinds: { grunt: { id: 'grunt', maxHp: 10, walkMs: 5000, attackDamage: 5, attackIntervalMs: 500 } },
+            groups: [trickle(['grunt', 'grunt', 'grunt', 'grunt'], { intervalMs: 0 })],
+        });
+    }
+
+    test('a correct answer results in the correct power-up', () => {
+        const model = create(powerUpLevel(['freeze']));
+        solveFirst(model);
+        expect(model.getInventory()).toEqual(['freeze']);
+    });
+
+    test('No power up level, list has nothing', () => {
+        const model = create(level());
+        solveFirst(model);
+        expect(model.getInventory()).toEqual([]);
+    });
+
+    test('wrong answer resets the streak', () => {
+        const model = create(powerUpLevel(['freeze'], 2));
+        solveFirst(model);
+        model.submit(99999); // Wrong answer.
+        solveFirst(model);
+        expect(model.getInventory()).toEqual([]);
+    });
+
+    test('using a power up you do not have does nothing', () => {
+        const model = create(powerUpLevel(['freeze']));
+        expect(model.usePowerUp()).toEqual([]);
+    });
+
+    test('freeze stops enemies for freezeMs, then they move again', () => {
+        const model = create(powerUpLevel(['freeze']));
+        solveFirst(model);
+        const before = model.getEnemies()[0].progress;
+
+        model.usePowerUp();
+        model.tick(2000);
+        expect(model.getEnemies()[0].progress).toBe(before);
+
+        model.tick(1000);
+        expect(model.getEnemies()[0].progress).toBeGreaterThan(before);
+    });
+
+    test('heal restores HP', () => {
+        const model = create(powerUpLevel(['heal']));
+        solveFirst(model);
+        model.tick(5000); // The 3 remaining enemies arrive and hit for 5 each: 30 -> 15.
+        model.usePowerUp();
+        expect(model.getPlayerHp()).toBe(25);
+    });
+
+    test('zap defeats an enemy', () => {
+        const model = create(powerUpLevel(['zap']));
+        solveFirst(model);
+        model.usePowerUp();
+        expect(model.getEnemies()).toHaveLength(2);
     });
 });
 
