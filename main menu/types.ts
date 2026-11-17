@@ -64,6 +64,15 @@ export interface MenuCharacter {
   /** Set false when the game model supplies its own animation. Defaults true. */
   idle?: boolean;
 }
+/** Player progress shown on the main menu, supplied by the host scene. */
+export interface MenuProgress {
+  /** Current classroom (yellow chalk). */
+  classroom: number;
+  /** Next level to beat in that classroom (orange chalk). */
+  level: number;
+  /** Completed share of all main levels, 0 to 1; sets the pencil length. */
+  completedRatio: number;
+}
 export interface MainMenuOptions {
   // See ../README.md for button destinations and host responsibilities.
   title?: string;
@@ -71,6 +80,8 @@ export interface MainMenuOptions {
   mapIconUrl?: string;
   /** Override foreground sprites; [] shows only the empty classroom plate. */
   characters?: readonly MenuCharacter[];
+  /** Blackboard equation and pencil bar; null hides both. */
+  progress?: MenuProgress | null;
   labels?: Partial<MenuLabels>;
   layout?: Partial<MenuLayout>;
   theme?: Partial<MenuTheme>;
