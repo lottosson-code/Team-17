@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { makeProblem } from '../combat/problems';
 import type { Enemy, EnemyKind, PowerUpKind } from '../combat/types';
-import { DANGER_START, heartFills, laneDanger, lowHealthLevel, POWER_UP_TEXTURE } from '../combat/view/hudLogic';
-
+import { DANGER_START, heartFills, laneDanger, lowHealthLevel, POWER_UP_TEXTURE, statLines } from '../combat/view/hudLogic';
 const KIND: EnemyKind = { id: 'grunt', maxHp: 10, walkMs: 1000, attackDamage: 1, attackIntervalMs: 500 };
 
 function enemy(id: number, lane: number, progress: number, state: Enemy['state'] = 'walking'): Enemy {
@@ -64,5 +63,28 @@ describe('POWER_UP_TEXTURE', () => {
         const kinds: PowerUpKind[] = ['freeze', 'heal', 'zap'];
         const keys = kinds.map(kind => POWER_UP_TEXTURE[kind]);
         expect(new Set(keys).size).toBe(kinds.length);
+    });
+});
+describe('statLines', () => {
+    test('shows solved, missed and accuracy as a whole percentage', () => {
+        expect(statLines({ solved: 12, missed: 3, accuracy: 0.8 })).toEqual([
+            { label: 'Solved', value: '12' },
+            { label: 'Missed', value: '3' },
+            { label: 'Accuracy', value: '80%' },
+        ]);
+    });
+
+    test('rounds accuracy to the nearest percent', () => {
+        expect(statLines({ solved: 2, missed: 1, accuracy: 2 / 3 })[2].value).toBe('67%');
+        expect(statLines({ solved: 1, missed: 199, accuracy: 1 / 200 })[2].value).toBe('1%');
+    });
+
+    test('shows a dash for accuracy when nothing was answered', () => {
+        expect(statLines({ solved: 0, missed: 0, accuracy: null })[2].value).toBe('—');
+    });
+
+    test('shows 0% and 100% at the extremes', () => {
+        expect(statLines({ solved: 0, missed: 4, accuracy: 0 })[2].value).toBe('0%');
+        expect(statLines({ solved: 9, missed: 0, accuracy: 1 })[2].value).toBe('100%');
     });
 });

@@ -1,5 +1,4 @@
-import { LANE_COUNT, type Enemy, type PowerUpKind } from '../types';
-
+import { LANE_COUNT, type CombatStats, type Enemy, type PowerUpKind } from '../types';
 // Pure helpers behind the HUD and battlefield, kept free of Phaser so they can be unit-tested.
 
 /** Progress at which a lane starts glowing red. */
@@ -26,6 +25,15 @@ export function laneDanger(enemies: readonly Readonly<Enemy>[]): number[] {
 export function heartFills(hp: number, maxHp: number, hearts = 5): number[] {
     const perHeart = maxHp / hearts;
     return Array.from({ length: hearts }, (_, i) => Math.min(1, Math.max(0, (hp - i * perHeart) / perHeart)));
+}
+
+/** The end screen's statistics, in display order. Accuracy is a whole percentage, or "—" with no answers. */
+export function statLines(stats: CombatStats): { label: string; value: string }[] {
+    return [
+        { label: 'Solved', value: String(stats.solved) },
+        { label: 'Missed', value: String(stats.missed) },
+        { label: 'Accuracy', value: stats.accuracy === null ? '—' : `${Math.round(stats.accuracy * 100)}%` },
+    ];
 }
 
 /** Low-health warning strength: 0 above 40% HP, rising to 1 at 0 HP. */
