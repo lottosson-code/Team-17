@@ -259,6 +259,17 @@
 }
 .cse-make24__op:disabled { opacity: .55; }
 
+/* ---- hints: the suggested cards and operation glow -------------------- */
+.cse-make24__card.is-hinted { border-color: var(--m24-gold); }
+.cse-make24__op.is-hinted {
+  opacity: 1;
+  box-shadow: inset 0 0 0 .2cqw var(--m24-gold), 0 .25cqw 0 #4c3722;
+}
+.cse-make24__card.is-hinted,
+.cse-make24__op.is-hinted {
+  animation: cse-make24-glow 1.2s ease-in-out infinite;
+}
+
 /* ---- step log, feedback, actions ------------------------------------- */
 .cse-make24__log {
   list-style: none; margin: 0; padding: 0;
@@ -408,6 +419,7 @@
 @keyframes cse-make24-shake { 20%, 60% { transform: translateX(-.5cqw); } 40%, 80% { transform: translateX(.5cqw); } }
 @keyframes cse-make24-bump { 40% { transform: scale(1.18); } }
 @keyframes cse-make24-fade { from { opacity: 0; } }
+@keyframes cse-make24-glow { 50% { filter: drop-shadow(0 0 1cqw #ffd76a); } }
 @keyframes cse-make24-rise { from { transform: translateY(1.5cqw); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
@@ -706,6 +718,10 @@ class Make24Model {
         /** The card made by the latest move, so the view can animate it. */
         this.freshId = null;
         this.solved = false;
+        /** The move the last hint suggested, or null if there's no hint showing. */
+        this.hint = null;
+        /** Hints used on the current puzzle. Any hint halves the coins for it. */
+        this.hintsUsed = 0;
         this.solvedCount = 0;
         this.streak = 0;
         this.history = [];
@@ -779,6 +795,8 @@ class Make24Model {
         this.clearSelection();
         this.freshId = null;
         this.solved = false;
+        this.hint = null;
+        this.hintsUsed = 0;
         this.startedAt = Date.now();
         // A puzzle dealt while the clock is paused starts paused at 0:00.
         if (this.pausedAt !== null)
@@ -862,6 +880,37 @@ class Make24Model {
         this.restore(start);
         return true;
     }
+    // ---- hints -------------------------------------------------------------
+    /**
+     * Suggest a next move that can still reach the target from the cards on the
+     * table right now. Returns null if these cards can't make the target anymore
+     * (the player needs to Undo or Reset), or if there is no move left to make.
+     */
+    useHint() {
+        this.hint = null;
+        const values = this.cards.map((card) => card.term.value);
+        const solution = findSolution(values, this.target);
+        // No solution: it's a dead end. No steps: only one card is left (e.g. already solved).
+        if (solution === null || solution.steps.length === 0) {
+            return null;
+        }
+        // The solver works with values, so find the cards that have those values.
+        const firstStep = solution.steps[0];
+        const left = this.cards.find((card) => card.term.value.equals(firstStep.left));
+        // The right card must be a different card, even if it has the same value (like 6 and 6).
+        const right = this.cards.find((card) => {
+            return card !== left && card.term.value.equals(firstStep.right);
+        });
+        if (left === undefined || right === undefined) {
+            return null;
+        }
+        // Start the hinted move fresh, so an old selection doesn't get in the way.
+        this.clearSelection();
+        this.freshId = null;
+        this.hintsUsed += 1;
+        this.hint = { leftId: left.id, op: firstStep.op, rightId: right.id };
+        return this.hint;
+    }
     // ---- internals ---------------------------------------------------------
     /** Merge two cards into one, in the second card's spot. */
     combine(leftId, op, rightId) {
@@ -876,6 +925,8 @@ class Make24Model {
         }
         // Save the table as it is now, so Undo can come back to it.
         this.history.push({ cards: this.cards, steps: this.steps });
+        // The table is changing, so the old hint no longer applies.
+        this.hint = null;
         const merged = this.makeCard(right.slot, joinTerms(left.term, op, right.term, value));
         const untouched = this.cards.filter((card) => card !== left && card !== right);
         this.cards = [...untouched, merged].sort((a, b) => a.slot - b.slot);
@@ -898,7 +949,11 @@ class Make24Model {
         this.solveTimeMs = Date.now() - this.startedAt;
         this.solvedCount += 1;
         this.streak += 1;
-        const coinsEarned = this.coinsForThisSolve();
+        let coinsEarned = this.coinsForThisSolve();
+        // Using any hints halves the coins for this puzzle (rounded down).
+        if (this.hintsUsed > 0) {
+            coinsEarned = Math.floor(coinsEarned / 2);
+        }
         this.coins += coinsEarned;
         return {
             numbers: [...this.numbers],
@@ -909,6 +964,7 @@ class Make24Model {
             timeMs: this.solveTimeMs,
             coinsEarned,
             totalCoins: this.coins,
+            hintsUsed: this.hintsUsed,
         };
     }
     coinsForThisSolve() {
@@ -926,6 +982,7 @@ class Make24Model {
         this.steps = snapshot.steps;
         this.clearSelection();
         this.freshId = null;
+        this.hint = null;
     }
     makeCard(slot, term) {
         const id = this.nextCardId;
@@ -1031,6 +1088,7 @@ function tutorialHTML(target) {
         <ol class="${PREFIX}__tutorial-steps">${step1}${step2}${step3}${step4}</ol>
         <p class="${PREFIX}__tutorial-tip">
           Made a mistake? <b>Undo</b> goes back one step and <b>Reset</b> starts over.
+          Stuck? <b>Hint</b> shows a next step, but halves the coins for that puzzle.
         </p>
         <button type="button" class="${PREFIX}__primary" data-action="close-tutorial">
           Got it
@@ -1123,7 +1181,11 @@ class Make24View {
         const coinLine = this.find(`.${C}__result-coins`);
         coinLine.hidden = result.coinsEarned === 0;
         this.find(`.${C}__result-coins span`).textContent = coinLabel(result.coinsEarned);
-        this.find(`.${C}__result-meta`).textContent = `Time ${formatTime(result.timeMs)} · Streak ${streak}`;
+        let meta = `Time ${formatTime(result.timeMs)} · Streak ${streak}`;
+        if (result.hintsUsed > 0) {
+            meta += ` · ${hintLabel(result.hintsUsed)}`;
+        }
+        this.find(`.${C}__result-meta`).textContent = meta;
     }
     showWinScreen() {
         this.winScreenEl.hidden = false;
@@ -1209,6 +1271,12 @@ class Make24View {
             button.disabled = !model.canPickOperation;
             button.setAttribute('aria-pressed', String(isChosen));
             button.classList.toggle('is-selected', isChosen);
+            // The operation the hint suggests glows, like the hinted cards.
+            let isHinted = false;
+            if (model.hint !== null) {
+                isHinted = button.dataset.op === model.hint.op;
+            }
+            button.classList.toggle('is-hinted', isHinted);
         }
         for (const button of Array.from(this.root.querySelectorAll('[data-difficulty]'))) {
             const isCurrent = button.dataset.difficulty === model.difficulty;
@@ -1216,6 +1284,7 @@ class Make24View {
         }
         this.find('[data-action="undo"]').disabled = !model.canUndo;
         this.find('[data-action="reset"]').disabled = !model.canUndo;
+        this.find('[data-action="hint"]').disabled = model.solved;
     }
     renderLog(model) {
         if (model.steps.length === 0) {
@@ -1295,6 +1364,9 @@ function panelHTML(target) {
       <ol class="${C}__log" aria-label="Your steps"></ol>
       <p class="${C}__feedback" role="status" aria-live="polite"></p>
       <div class="${C}__actions">
+        <button type="button" data-action="hint" title="Show a next step (halves this puzzle's coins)">
+          Hint
+        </button>
         <button type="button" data-action="undo">Undo</button>
         <button type="button" data-action="reset">Reset</button>
         <button type="button" data-action="skip">New puzzle</button>
@@ -1323,6 +1395,8 @@ function cardHTML(card, model) {
         classes.push('is-selected');
     if (card.id === model.freshId)
         classes.push('is-fresh');
+    if (isHintedCard(card, model))
+        classes.push('is-hinted');
     if (model.cards.length === 1) {
         // Last card left: green if it's the target, red if not.
         if (card.term.value.equals(model.target))
@@ -1338,6 +1412,13 @@ function cardHTML(card, model) {
       aria-pressed="${isSelected}" aria-label="Number ${spokenValue(card.term.value)}" ${disabled}>
       <span class="${C}__key" aria-hidden="true">${card.slot + 1}</span>${valueHTML(card.term.value)}
     </button>`;
+}
+/** True if the current hint points at this card. */
+function isHintedCard(card, model) {
+    if (model.hint === null) {
+        return false;
+    }
+    return card.id === model.hint.leftId || card.id === model.hint.rightId;
 }
 /** A card's number: a whole number, or a stacked fraction like ⁸⁄₃. */
 function valueHTML(value) {
@@ -1372,6 +1453,12 @@ function coinLabel(coins) {
         return '+1 coin';
     return `+${coins} coins`;
 }
+/** "1 hint" or "2 hints". */
+function hintLabel(hints) {
+    if (hints === 1)
+        return '1 hint';
+    return `${hints} hints`;
+}
 /** Milliseconds as minutes:seconds, e.g. 65000 → "1:05". */
 function formatTime(ms) {
     const totalSeconds = Math.floor(ms / 1000);
@@ -1380,6 +1467,22 @@ function formatTime(ms) {
     return `${minutes}:${seconds}`;
 }
 
+/**
+ * Make 24 minigame for Math Nightmare.
+ *
+ * mountMake24 connects the game state (Make24Model) to the screen (Make24View):
+ * it turns the player's clicks and key presses into model calls, then tells the
+ * view to redraw. It reports results to the rest of the game through callbacks.
+ *
+ *   import { mountMake24 } from './minigames/make24/src/make24';
+ *   import './minigames/make24/src/make24.css';
+ *
+ *   const game = mountMake24(container, {
+ *     difficulty: 'normal',
+ *     onSolve: (result) => { player.coins = result.totalCoins; },
+ *     onExit: () => { game.destroy(); showMap(); },
+ *   });
+ */
 /** Pause before the win screen appears, so the player sees the final card first. */
 const WIN_SCREEN_DELAY_MS = 650;
 /** How often the on-screen timer updates. */
@@ -1487,6 +1590,27 @@ function mountMake24(host, options = {}) {
             view.setFeedback('');
         }
     }
+    /** Highlight a next move that still reaches the target, and say it in words. */
+    function showHint() {
+        if (model.solved)
+            return;
+        const hint = model.useHint();
+        if (hint === null) {
+            view.setFeedback(`These numbers can't make ${target} anymore. Try Undo or Reset.`, 'warn');
+        }
+        else {
+            view.setFeedback(`Hint: try ${hintText(hint)}. Hints halve this puzzle's coins.`);
+        }
+        view.render(model);
+    }
+    /** The hinted move in words, e.g. "8 ÷ 3". */
+    function hintText(hint) {
+        const left = model.cardById(hint.leftId);
+        const right = model.cardById(hint.rightId);
+        if (left === undefined || right === undefined)
+            return '';
+        return `${left.term.value} ${OP_SYMBOL[hint.op]} ${right.term.value}`;
+    }
     function changeDifficulty(difficulty) {
         const changed = model.setDifficulty(difficulty);
         if (!changed)
@@ -1558,6 +1682,9 @@ function mountMake24(host, options = {}) {
     }
     function runAction(action) {
         switch (action) {
+            case 'hint':
+                showHint();
+                break;
             case 'undo':
                 undo();
                 break;
@@ -1633,6 +1760,8 @@ function mountMake24(host, options = {}) {
             reset();
         else if (key === 'n' || key === 'N')
             skipPuzzle();
+        else if (key === 'h' || key === 'H')
+            showHint();
         else if (key === '?')
             openTutorial();
         else if (key === 'Escape')
