@@ -23,8 +23,12 @@ export interface BlacksmithViewInterface {
     onBackToMap(callback: () => void): void;
 }
 
+const SOUND_CLICK = '/assets/sounds/click.mp3';
+const SOUND_SUCCESS = '/assets/sounds/forge-success.mp3';
+const SOUND_FAIL = '/assets/sounds/forge-fail.mp3';
+
 /**
- * BlacksmithView - Minimal Sprint 1 Konva view for the Armor Forge minigame.
+ * BlacksmithView - Konva view for the blacksmith minigame.
  * Players click an item box and type their answer on the keyboard.
  */
 export class BlacksmithView implements BlacksmithViewInterface {
@@ -51,6 +55,7 @@ export class BlacksmithView implements BlacksmithViewInterface {
         ingot: null,
     };
 
+    // listener variables
     private difficultyCallback: ((difficulty: Difficulty) => void) | null = null;
     private typeGuessCallback: ((itemId: ItemId, rawText: string) => void) | null = null;
     private submitForgeCallback: (() => void) | null = null;
@@ -85,7 +90,9 @@ export class BlacksmithView implements BlacksmithViewInterface {
 
         // Back to Map button
         const backBtn = this.createButton(20, 20, 120, 36, 'Back to Map');
+        // send out back to map click events to the controller
         backBtn.on('click tap', () => {
+            this.playSound(SOUND_CLICK);
             if (this.backToMapCallback !== null) {
                 this.backToMapCallback();
             }
@@ -98,7 +105,9 @@ export class BlacksmithView implements BlacksmithViewInterface {
             const diff = difficulties[i];
             const btnX = 680 + i * 85;
             const btn = this.createButton(btnX, 20, 75, 36, diff.toUpperCase());
+            // send out difficulty click events to the controller
             btn.on('click tap', () => {
+                this.playSound(SOUND_CLICK);
                 if (this.difficultyCallback !== null) {
                     this.difficultyCallback(diff);
                 }
@@ -138,6 +147,7 @@ export class BlacksmithView implements BlacksmithViewInterface {
 
         // Submit button
         const forgeBtn = this.createButton(width / 2 - 90, 470, 180, 44, 'FORGE ARMOR');
+        // send out forge click events to the controller
         forgeBtn.on('click tap', () => {
             if (this.submitForgeCallback !== null) {
                 this.submitForgeCallback();
@@ -160,6 +170,25 @@ export class BlacksmithView implements BlacksmithViewInterface {
         this.setupKeyboardInput();
     }
 
+    /**
+     * Safely plays a sound effect in the browser.
+     * Checks if Audio exists first so Node/Vitest unit tests do not crash.
+     */
+    private playSound(soundPath: string): void {
+        if (typeof Audio === 'undefined') {
+            return;
+        }
+
+        try {
+            const sound = new Audio(soundPath);
+            sound.play().catch(function () {
+                // Ignore browser autoplay restrictions
+            });
+        } catch {
+            // Ignore audio errors in test environments
+        }
+    }
+    
     private setupKeyboardInput(): void {
         if (typeof window === 'undefined') {
             return;
@@ -176,6 +205,8 @@ export class BlacksmithView implements BlacksmithViewInterface {
                 const shortened = currentText.slice(0, currentText.length - 1);
                 this.typedInputs[this.selectedItem] = shortened;
                 this.updateGuessDisplay(this.selectedItem, shortened);
+
+                // send out the updated guess to the controller
                 if (this.typeGuessCallback !== null) {
                     this.typeGuessCallback(this.selectedItem, shortened);
                 }
@@ -184,10 +215,12 @@ export class BlacksmithView implements BlacksmithViewInterface {
                     this.submitForgeCallback();
                 }
             } else if (event.key.length === 1 && currentText.length < 5) {
-                // Sprint 1: allow any typed character; model validation catches mistypes
+                // allow any typed character; model validation catches mistypes
                 const updated = currentText + event.key;
                 this.typedInputs[this.selectedItem] = updated;
                 this.updateGuessDisplay(this.selectedItem, updated);
+
+                // send out the updated guess to the controller
                 if (this.typeGuessCallback !== null) {
                     this.typeGuessCallback(this.selectedItem, updated);
                 }
@@ -227,6 +260,7 @@ export class BlacksmithView implements BlacksmithViewInterface {
     }
 
     private selectInputBox(itemId: ItemId): void {
+        this.playSound(SOUND_CLICK);
         this.selectedItem = itemId;
 
         const allIds: ItemId[] = ['feather', 'potion', 'ingot'];
@@ -383,6 +417,13 @@ export class BlacksmithView implements BlacksmithViewInterface {
 
     public showFeedback(result: ValidationResult): void {
         this.feedbackText.text(result.message);
+
+        if (result.isValid) {
+            this.playSound(SOUND_SUCCESS);
+        } else {
+            this.playSound(SOUND_FAIL);
+        }
+        
         const layer = this.rootGroup.getLayer();
         if (layer !== null) {
             layer.batchDraw();
