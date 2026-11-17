@@ -123,6 +123,8 @@ vi.mock('../../ui/quitModal', () => ({
 import { MainMenuScene } from '../MainMenuScene';
 import { soundManager } from '../../audio/soundManager';
 import { mapProgressStore } from '../../state/mapProgressStore';
+// Last-played save used by Continue.
+import { clearLastPlayed, loadLastPlayed, saveLastPlayed } from '../../ui/lastPlayed';
 
 describe('MainMenuScene', () => {
   let scene: MainMenuScene;
@@ -135,6 +137,8 @@ describe('MainMenuScene', () => {
     startMusicSpy = vi.spyOn(soundManager, 'startMenuMusic').mockImplementation(() => {});
     stopMusicSpy = vi.spyOn(soundManager, 'stopMenuMusic').mockImplementation(() => {});
     playSfxSpy = vi.spyOn(soundManager, 'playSfx').mockImplementation(() => {});
+    // Every test starts like a first-time player, with no saved level.
+    clearLastPlayed();
 
     scene = new MainMenuScene();
   });
@@ -301,5 +305,54 @@ describe('MainMenuScene', () => {
     expect(mockHostDestroy).toHaveBeenCalledTimes(1);
     expect(stopMusicSpy).toHaveBeenCalledTimes(1);
     expect(scene.ui).toBeNull();
+  });
+
+  // A sample map selection: classroom 2, level 4.
+  const classroom2Level4 = {
+    roomId: 'classroom-02',
+    levelId: 'classroom-02-level-04',
+    levelNumber: 4,
+    selectionCount: 1,
+  };
+
+  /** Reads the `hidden` menu option the scene passed to createGameUI. */
+  const hiddenOption = () =>
+    (capturedGameUIOptions.menu as { hidden?: Record<string, boolean> } | undefined)?.hidden;
+
+  it('hides Continue for a first-time player and shows it once a level was played', () => {
+    scene.create();
+    expect(hiddenOption()).toEqual({ continue: true });
+
+    saveLastPlayed(classroom2Level4);
+    scene.create();
+    expect(hiddenOption()).toEqual({ continue: false });
+  });
+
+  it('Continue reopens the level that was played last', () => {
+    scene.create();
+    // Playing a level from the map saves it.
+    capturedGameUIOptions.onLevelSelect!(classroom2Level4);
+    vi.mocked(scene.scene.start).mockClear();
+
+    capturedGameUIOptions.menu!.callbacks!.continue({ action: 'continue' });
+
+    expect(scene.scene.start).toHaveBeenCalledWith('Combat', {
+      moduleId: 2,
+      levelId: 4,
+      activity: 'level',
+      selectionId: 'classroom-02-level-04',
+    });
+    expect(mockGameUIController.showMap).not.toHaveBeenCalled();
+  });
+
+  it('New Game forgets the last played level and hides Continue', () => {
+    saveLastPlayed(classroom2Level4);
+    scene.create();
+    const menu = { update: vi.fn() };
+
+    capturedGameUIOptions.menu!.callbacks!.newGame({ action: 'newGame', menu });
+
+    expect(loadLastPlayed()).toBeNull();
+    expect(menu.update).toHaveBeenCalledWith({ hidden: { continue: true } });
   });
 });

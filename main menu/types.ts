@@ -87,6 +87,8 @@ export interface MainMenuOptions {
   theme?: Partial<MenuTheme>;
   callbacks?: MenuCallbacks;
   disabled?: Partial<Record<MenuAction, boolean>>;
+  /** Buttons to hide, e.g. Continue when there is no saved level. Hidden buttons are also disabled. */
+  hidden?: Partial<Record<MenuAction, boolean>>;
   onError?: (error: unknown, context: MenuActionContext) => void;
 }
 export interface MainMenuController {

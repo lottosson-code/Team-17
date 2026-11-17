@@ -58,6 +58,8 @@ class MainMenu implements MainMenuController {
   private labels: MenuLabels = { ...defaultLabels };
   private callbacks: MenuCallbacks = {};
   private disabled: Partial<Record<MenuAction, boolean>> = {};
+  /** Which buttons are hidden, e.g. Continue with no saved level (set through options.hidden). */
+  private hidden: Partial<Record<MenuAction, boolean>> = {};
   private pending: AbortController | undefined;
   private destroyed = false;
 
@@ -141,6 +143,8 @@ class MainMenu implements MainMenuController {
     this.options = { ...this.options, ...patch };
     this.labels = { ...this.labels, ...patch.labels };
     this.disabled = { ...this.disabled, ...patch.disabled };
+    // Keep earlier hidden settings; the patch only changes the buttons it names.
+    this.hidden = { ...this.hidden, ...patch.hidden };
     if (patch.callbacks) this.callbacks = { ...this.callbacks, ...patch.callbacks };
     this.title.textContent = this.options.title ?? defaultTitle;
     this.navigation.setAttribute('aria-label', this.labels.navigation);
@@ -160,6 +164,8 @@ class MainMenu implements MainMenuController {
       if (action === 'map') this.mapLabel.textContent = this.labels.map;
       else this.buttons.get(action)!.textContent = this.labels[action];
     }
+    // Show or hide each button; CSS shrinks the panel when one is hidden.
+    for (const [action, button] of this.buttons) button.hidden = Boolean(this.hidden[action]);
     for (const [key, value] of Object.entries(patch.layout ?? {})) {
       if (value !== undefined) this.element.style.setProperty(layoutVariables[key as keyof MenuLayout], `${value}%`);
     }
@@ -256,7 +262,8 @@ class MainMenu implements MainMenuController {
   }
 
   private refreshDisabledState(): void {
-    for (const [action, button] of this.buttons) button.disabled = Boolean(this.pending || this.disabled[action]);
+    // A hidden button is also disabled, so arrow keys and focus skip it.
+    for (const [action, button] of this.buttons) button.disabled = Boolean(this.pending || this.disabled[action] || this.hidden[action]);
     this.element.setAttribute('aria-busy', String(Boolean(this.pending)));
   }
 

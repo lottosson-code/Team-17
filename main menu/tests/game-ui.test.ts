@@ -97,3 +97,24 @@ it.each([
     host.remove();
   }
 });
+
+// The Continue button can be hidden (no saved level) and shown again.
+it('hides and shows a menu button with the hidden option', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const menu = createMainMenu(host, { hidden: { continue: true } });
+
+  try {
+    const button = host.querySelector<HTMLButtonElement>('[data-action="continue"]')!;
+    // Hidden buttons are also disabled, so keyboard focus skips them.
+    expect(button.hidden).toBe(true);
+    expect(button.disabled).toBe(true);
+
+    menu.update({ hidden: { continue: false } });
+    expect(button.hidden).toBe(false);
+    expect(button.disabled).toBe(false);
+  } finally {
+    menu.destroy();
+    host.remove();
+  }
+});
