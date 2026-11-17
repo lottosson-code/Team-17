@@ -377,6 +377,7 @@ export class BlacksmithView implements BlacksmithViewInterface {
                         y: rowY,
                         width: 40,
                         height: 40,
+                        image: undefined
                     });
                     this.boardGroup.add(imgNode);
                 });
@@ -407,6 +408,7 @@ export class BlacksmithView implements BlacksmithViewInterface {
                     y: 0,
                     width: 32,
                     height: 32,
+                    image: undefined
                 });
                 this.answersGroup.add(imgNode);
             });
