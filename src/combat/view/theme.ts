@@ -114,6 +114,12 @@ export const CURSED_CLASSROOM: BattlefieldTheme = {
             },
         },
         miniBoss: { texture: 'enemy-sharpener', file: 'pencil-sharpener', name: 'Sharpener Brute', height: 220 },
+        // Made from one drawing by scripts/make-eraser-variants.py. The mini-boss's height includes its horns.
+        eraser_miniboss: { texture: 'enemy-eraser-boss', file: 'eraser-boss', name: 'Eraser Overlord', height: 340, faceLeft: true },
+        eraser_giant: { texture: 'enemy-eraser-giant', file: 'eraser-giant', name: 'Giant Eraser', height: 185, faceLeft: true },
+        eraser_large: { texture: 'enemy-eraser-big', file: 'eraser-big', name: 'Large Eraser', height: 150, faceLeft: true },
+        eraser: { texture: 'enemy-eraser', file: 'eraser', name: 'Eraser', height: 125, faceLeft: true },
+        eraser_baby: { texture: 'enemy-eraser-baby', file: 'eraser-baby', name: 'Baby Eraser', height: 80, faceLeft: true },
     },
     boss: { texture: 'enemy-charcoal-book', file: 'charcoal-book', name: 'The Cursed Tome', height: 200 },
 };

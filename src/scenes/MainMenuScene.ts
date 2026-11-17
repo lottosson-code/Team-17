@@ -75,8 +75,11 @@ export class MainMenuScene extends Phaser.Scene {
           },
           settings: ({ signal }) => {
             soundManager.playSfx('modalOpen');
+            // Returning a Promise keeps the main menu controller in a busy state (disabling
+            // duplicate activations) until the modal is closed and the promise resolves.
             return new Promise<void>((resolve) => {
               const modal = createSettingsModal(host.element, {
+                signal,
                 onClose: () => {
                   this.settingsModal = null;
                   soundManager.playSfx('modalClose');
@@ -89,6 +92,7 @@ export class MainMenuScene extends Phaser.Scene {
                 () => {
                   modal.destroy();
                   this.settingsModal = null;
+                  resolve();
                 },
                 { once: true }
               );
@@ -96,8 +100,11 @@ export class MainMenuScene extends Phaser.Scene {
           },
           quit: ({ signal }) => {
             soundManager.playSfx('modalOpen');
+            // Returning a Promise keeps the main menu controller in a busy state (disabling
+            // duplicate activations) until the modal is closed and the promise resolves.
             return new Promise<void>((resolve) => {
               const modal = createQuitModal(host.element, {
+                signal,
                 onCancel: () => {
                   this.quitModal = null;
                   soundManager.playSfx('modalClose');
@@ -113,6 +120,7 @@ export class MainMenuScene extends Phaser.Scene {
                 () => {
                   modal.destroy();
                   this.quitModal = null;
+                  resolve();
                 },
                 { once: true }
               );

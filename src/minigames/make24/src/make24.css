@@ -1,4 +1,10 @@
+/* Make 24 minigame — Math Nightmare.
+   Every selector is prefixed .cse-make24 so nothing leaks into the host game.
+   Sizes use cqw (1% of the scene width) so the whole 16:9 scene scales together,
+   the same way the main menu does. */
 
+/* Bundled fonts (SIL Open Font License, see fonts/FONTS-LICENSE.txt), subset to Latin.
+   Paths are relative to this file; adjust if you move the fonts folder. */
 @font-face { font-family: 'Lora'; src: url('../fonts/Lora-Variable.woff') format('woff');
   font-weight: 400 700; font-style: normal; font-display: swap; }
 @font-face { font-family: 'Poppins'; src: url('../fonts/Poppins-Regular.woff') format('woff');
@@ -7,7 +13,7 @@
   font-weight: 700; font-style: normal; font-display: swap; }
 
 .cse-make24 {
-
+  /* Shared palette with the main menu */
   --m24-title-color: #fff0be;
   --m24-title-outline: #303b34;
   --m24-title-font: 'Lora', Georgia, 'Palatino Linotype', serif;
@@ -19,7 +25,7 @@
   --m24-button-text-color: #ffffff;
   --m24-focus-color: #fff3b8;
 
-
+  /* Minigame-specific */
   --m24-topbar-center: 9.5%; /* Map button, title and stats share this center line */
   --m24-ink: #45321f;
   --m24-ink-soft: #6d5438;
@@ -70,6 +76,7 @@
 
 /* ---- top bar ---------------------------------------------------------- */
 .cse-make24__title {
+  /* Same look as the main menu's "Math Nightmare" title, a bit smaller. */
   position: absolute; top: var(--m24-topbar-center); left: 50%; transform: translate(-50%, -50%);
   margin: 0; white-space: nowrap;
   color: var(--m24-title-color);
@@ -159,6 +166,17 @@
 .cse-make24__difficulty button:hover { background: #75563822; }
 .cse-make24__difficulty button[aria-pressed="true"] { background: var(--m24-button-color); color: #fff; }
 
+.cse-make24__tools { display: flex; flex: none; align-items: center; gap: .8cqw; }
+.cse-make24__help {
+  appearance: none; margin: 0; padding: 0;
+  width: 2.5cqw; height: 2.5cqw; border-radius: 50%;
+  font-family: var(--m24-title-font); font-size: 1.5cqw; font-weight: 700; line-height: 1;
+  color: var(--m24-button-color); background: #f7eed48c;
+  border: .12cqw solid var(--m24-button-color);
+  transition: background-color 140ms ease, color 140ms ease;
+}
+.cse-make24__help:hover { background: var(--m24-button-color); color: #fff; }
+
 /* ---- number cards ----------------------------------------------------- */
 .cse-make24__cards {
   display: grid; grid-template-columns: repeat(4, 9.4cqw); justify-content: center; gap: 2cqw;
@@ -233,6 +251,17 @@
 }
 .cse-make24__op:disabled { opacity: .55; }
 
+/* ---- hints: the suggested cards and operation glow -------------------- */
+.cse-make24__card.is-hinted { border-color: var(--m24-gold); }
+.cse-make24__op.is-hinted {
+  opacity: 1;
+  box-shadow: inset 0 0 0 .2cqw var(--m24-gold), 0 .25cqw 0 #4c3722;
+}
+.cse-make24__card.is-hinted,
+.cse-make24__op.is-hinted {
+  animation: cse-make24-glow 1.2s ease-in-out infinite;
+}
+
 /* ---- step log, feedback, actions ------------------------------------- */
 .cse-make24__log {
   list-style: none; margin: 0; padding: 0;
@@ -270,7 +299,7 @@
 .cse-make24__actions button:disabled { opacity: .4; }
 
 /* ---- win overlay ------------------------------------------------------ */
-.cse-make24__overlay {
+.cse-make24__overlay, .cse-make24__tutorial {
   position: absolute; inset: 0; z-index: 5;
   display: grid; place-items: center;
   background: #120d0aa6;
@@ -310,11 +339,79 @@
 .cse-make24__secondary { color: var(--m24-button-color); background: transparent; border: .12cqw solid var(--m24-button-color); }
 .cse-make24__secondary:hover { background: #f7eed48c; }
 
+/* ---- how-to-play card ---------------------------------------------- */
+.cse-make24__tutorial { z-index: 6; }
+.cse-make24__tutorial-card {
+  width: 64%; padding: 2cqw 2.4cqw 1.8cqw; text-align: center;
+  background: var(--m24-panel-color);
+  border: .1cqw solid var(--m24-frame-color);
+  box-shadow: 0 .4cqw 2cqw #0009, inset 0 0 0 .45cqw #c9b88f, inset 0 0 0 .55cqw var(--m24-frame-color);
+  animation: cse-make24-rise 280ms ease-out;
+}
+.cse-make24__tutorial-title {
+  margin: 0; font-family: var(--m24-title-font); font-size: 3.2cqw; line-height: 1.1;
+  color: var(--m24-title-color); -webkit-text-stroke: .1cqw var(--m24-title-outline); paint-order: stroke fill;
+  text-shadow: 0 .2cqw .05cqw #3a2c20;
+}
+.cse-make24__tutorial-goal { margin: .6cqw 0 1.4cqw; font-size: 1.45cqw; }
+.cse-make24__tutorial-goal b { font-family: var(--m24-title-font); font-size: 1.7cqw; }
+.cse-make24__tutorial-steps {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.1cqw;
+  counter-reset: cse-make24-step;
+}
+.cse-make24__tutorial-steps li {
+  position: relative; counter-increment: cse-make24-step;
+  display: flex; flex-direction: column; align-items: center; gap: .35cqw;
+  padding: 1.1cqw .8cqw 1cqw;
+  background: #f7eed4b3; border: .1cqw solid var(--m24-frame-color); border-radius: .5cqw;
+}
+.cse-make24__tutorial-steps li::before {
+  content: counter(cse-make24-step);
+  position: absolute; top: -.9cqw; left: 50%; transform: translateX(-50%);
+  width: 1.8cqw; height: 1.8cqw; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 1.05cqw; font-weight: 700; color: #fff; background: var(--m24-button-color);
+}
+.cse-make24__tutorial-steps b { font-size: 1.3cqw; }
+.cse-make24__tutorial-steps li > span { font-size: 1.1cqw; line-height: 1.3; color: var(--m24-ink-soft); }
+.cse-make24__tut-art {
+  height: 6.6cqw; display: flex; align-items: center; justify-content: center; gap: .5cqw;
+}
+.cse-make24__tut-card {
+  width: 4.2cqw; height: 5.4cqw; border-radius: .45cqw;
+  display: grid; place-items: center;
+  font-family: var(--m24-body-font); font-size: 2.4cqw; font-weight: 700; color: var(--m24-ink);
+  background: var(--m24-card); border: .14cqw solid var(--m24-card-edge);
+  box-shadow: 0 .2cqw 0 #6c5134;
+}
+.cse-make24__tut-card.is-selected {
+  transform: translateY(-.4cqw); border-color: var(--m24-gold);
+  box-shadow: 0 0 0 .18cqw var(--m24-focus-color), 0 .2cqw 0 #8a6427, 0 .3cqw .9cqw #f3c25a99;
+}
+.cse-make24__tut-card.is-win {
+  color: var(--m24-good); border-color: var(--m24-gold);
+  box-shadow: 0 0 0 .18cqw var(--m24-focus-color), 0 0 1.4cqw #ffd76acc;
+}
+.cse-make24__tut-frac { display: inline-flex; flex-direction: column; align-items: center; font-size: 1.5cqw; line-height: 1.05; }
+.cse-make24__tut-frac span:first-child { padding: 0 .25cqw .1cqw; border-bottom: .14cqw solid currentColor; }
+.cse-make24__tut-op {
+  width: 4.6cqw; height: 3.2cqw; border-radius: .25cqw;
+  display: grid; place-items: center;
+  font-family: var(--m24-body-font); font-size: 2.1cqw; font-weight: 700;
+  color: var(--m24-button-color); background: var(--m24-title-color);
+  box-shadow: inset 0 0 0 .16cqw var(--m24-gold), 0 .2cqw 0 #8a6427, 0 0 .9cqw #ffd76a99;
+}
+.cse-make24__tut-arrow { font-size: 1.6cqw; color: var(--m24-ink-soft); }
+.cse-make24__tutorial-tip { margin: 1.3cqw 0 1.2cqw; font-size: 1.2cqw; color: var(--m24-ink-soft); }
+.cse-make24__tutorial .cse-make24__primary { min-width: 14cqw; }
+
 /* ---- motion ----------------------------------------------------------- */
 @keyframes cse-make24-pop { from { transform: scale(.82); } 70% { transform: scale(1.06); } to { transform: scale(1); } }
 @keyframes cse-make24-shake { 20%, 60% { transform: translateX(-.5cqw); } 40%, 80% { transform: translateX(.5cqw); } }
 @keyframes cse-make24-bump { 40% { transform: scale(1.18); } }
 @keyframes cse-make24-fade { from { opacity: 0; } }
+@keyframes cse-make24-glow { 50% { filter: drop-shadow(0 0 1cqw #ffd76a); } }
 @keyframes cse-make24-rise { from { transform: translateY(1.5cqw); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {

@@ -7,8 +7,13 @@
  * run is identical.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mountMake24 } from '../../minigames/make24/src/make24';
-import type { Make24Controller, Make24Options, Make24Result } from '../../minigames/make24/src/make24';
+import { TUTORIAL_SEEN_KEY, mountMake24 } from '../../minigames/make24/src/make24';
+import type {
+  Make24Controller,
+  Make24Options,
+  Make24Result,
+  TutorialStorage,
+} from '../../minigames/make24/src/make24';
 
 let container: HTMLElement;
 let game: Make24Controller | undefined;
@@ -28,8 +33,9 @@ afterEach(() => {
 
 /* ---- helpers ------------------------------------------------------------ */
 
+/** Mounts the game. The how-to-play card is off unless a test turns it on. */
 function mount(options: Make24Options = {}) {
-  game = mountMake24(container, { keyboard: false, ...options });
+  game = mountMake24(container, { keyboard: false, tutorial: 'never', ...options });
   return game.element;
 }
 
@@ -330,5 +336,209 @@ describe('skipping, exiting and cleanup', () => {
     game!.destroy();
     game = undefined;
     expect(container.querySelector('.cse-make24')).toBeNull();
+  });
+});
+
+describe('how-to-play tutorial', () => {
+  const tutorial = () => find('.cse-make24__tutorial');
+
+  /** A fake storage, so these tests don't depend on the test environment's own storage. */
+  class FakeStorage implements TutorialStorage {
+    saved = new Map<string, string>();
+
+    getItem(key: string): string | null {
+      const value = this.saved.get(key);
+      if (value === undefined) {
+        return null;
+      }
+      return value;
+    }
+
+    setItem(key: string, value: string): void {
+      this.saved.set(key, value);
+    }
+  }
+
+  let storage: FakeStorage;
+
+  beforeEach(() => {
+    storage = new FakeStorage(); // every test starts as a first-time player
+  });
+
+  /** Mounts the game with the tutorial on, using this test's fake storage. */
+  function mountWithTutorial(options: Make24Options) {
+    return mount({ tutorial: 'first-time', tutorialStorage: storage, ...options });
+  }
+
+  it('opens by itself the first time and is remembered after "Got it"', () => {
+    mountWithTutorial({ numbers: [4, 7, 8, 9] });
+    expect(tutorial().hidden).toBe(false);
+
+    find<HTMLButtonElement>('[data-action="close-tutorial"]').click();
+    expect(tutorial().hidden).toBe(true);
+    expect(storage.saved.get(TUTORIAL_SEEN_KEY)).toBe('1');
+
+    // Opening the game again: the player has seen it, so it stays closed.
+    game!.destroy();
+    mountWithTutorial({ numbers: [4, 7, 8, 9] });
+    expect(tutorial().hidden).toBe(true);
+  });
+
+  it('is on by default (first-time), so a new player sees it without any option', () => {
+    // No tutorial option at all: the default should be 'first-time'.
+    game = mountMake24(container, {
+      numbers: [4, 7, 8, 9],
+      keyboard: false,
+      tutorialStorage: storage,
+    });
+    expect(tutorial().hidden).toBe(false);
+  });
+
+  it("'always' opens it even after it has been seen", () => {
+    storage.setItem(TUTORIAL_SEEN_KEY, '1');
+    mountWithTutorial({ numbers: [4, 7, 8, 9], tutorial: 'always' });
+    expect(tutorial().hidden).toBe(false);
+  });
+
+  it("'never' keeps it closed, even for a first-time player", () => {
+    mountWithTutorial({ numbers: [4, 7, 8, 9], tutorial: 'never' });
+    expect(tutorial().hidden).toBe(true);
+  });
+
+  it('the ? button and showTutorial() open it again', () => {
+    mountWithTutorial({ numbers: [4, 7, 8, 9], tutorial: 'never' });
+    find<HTMLButtonElement>('[data-action="help"]').click();
+    expect(tutorial().hidden).toBe(false);
+
+    find<HTMLButtonElement>('[data-action="close-tutorial"]').click();
+    game!.showTutorial();
+    expect(tutorial().hidden).toBe(false);
+  });
+
+  it('clicking the dark area around the card closes it', () => {
+    mountWithTutorial({ numbers: [4, 7, 8, 9], tutorial: 'always' });
+    tutorial().click(); // the backdrop itself, not the card
+    expect(tutorial().hidden).toBe(true);
+  });
+
+  it('clicking inside the card does not close it', () => {
+    mountWithTutorial({ numbers: [4, 7, 8, 9], tutorial: 'always' });
+    find('.cse-make24__tutorial-card').click();
+    expect(tutorial().hidden).toBe(false);
+  });
+
+  it('pauses the timer while it is open', () => {
+    const onSolve = vi.fn();
+    mountWithTutorial({ numbers: [6, 6, 6, 6], tutorial: 'always', onSolve });
+    vi.advanceTimersByTime(10_000); // reading the card for 10 s
+    expect(stat('time')).toBe('0:00');
+
+    find<HTMLButtonElement>('[data-action="close-tutorial"]').click();
+    vi.advanceTimersByTime(3_000); // then playing for 3 s
+    solveSixes();
+    expect((onSolve.mock.calls[0][0] as Make24Result).timeMs).toBe(3_000);
+  });
+
+  it('shows the target the game was set up with', () => {
+    mountWithTutorial({ numbers: [1, 2, 3, 4], target: 10, tutorial: 'always' });
+    expect(find('.cse-make24__tutorial-goal').textContent).toContain('make 10');
+    expect(find('.cse-make24__tut-card.is-win').textContent).toBe('10');
+  });
+
+  it('still works when storage is blocked', () => {
+    const blocked: TutorialStorage = {
+      getItem: () => {
+        throw new Error('storage blocked');
+      },
+      setItem: () => {
+        throw new Error('storage blocked');
+      },
+    };
+    mount({ numbers: [4, 7, 8, 9], tutorial: 'first-time', tutorialStorage: blocked });
+    expect(tutorial().hidden).toBe(false); // can't tell if it was seen, so it shows
+    find<HTMLButtonElement>('[data-action="close-tutorial"]').click();
+    expect(tutorial().hidden).toBe(true); // closing works even though saving failed
+  });
+});
+
+describe('hints', () => {
+  const hintButton = () => find<HTMLButtonElement>('[data-action="hint"]');
+
+  /** Slots of the cards the hint is pointing at, e.g. [0, 2]. */
+  function hintedSlots(): number[] {
+    const hinted: number[] = [];
+    slots().forEach((card, slot) => {
+      if (card !== null && card.classList.contains('is-hinted')) {
+        hinted.push(slot);
+      }
+    });
+    return hinted;
+  }
+
+  /** The operations the hint is pointing at, e.g. ['/']. */
+  function hintedOps(): string[] {
+    const hinted: string[] = [];
+    const buttons = container.querySelectorAll<HTMLButtonElement>('[data-op].is-hinted');
+    for (const button of Array.from(buttons)) {
+      if (button.dataset.op !== undefined) {
+        hinted.push(button.dataset.op);
+      }
+    }
+    return hinted;
+  }
+
+  it('lights up two cards and an operation, and says the move', () => {
+    mount({ numbers: [3, 3, 8, 8] });
+    hintButton().click();
+    // 3 3 8 8 is solved by 8 ÷ (3 − 8 ÷ 3), so the first step is 8 ÷ 3.
+    expect(feedback()).toContain('Hint: try 8 ÷ 3');
+    expect(hintedSlots()).toEqual([0, 2]);
+    expect(hintedOps()).toEqual(['/']);
+  });
+
+  it('can be followed all the way to a solve, for half the coins', () => {
+    const onSolve = vi.fn();
+    mount({ numbers: [3, 3, 8, 8], onSolve });
+    hintButton().click();
+    combine(2, '/', 0); // 8 ÷ 3, as hinted
+    expect(hintedSlots()).toEqual([]); // the move used up the hint
+
+    hintButton().click();
+    expect(feedback()).toContain('Hint: try 3 − 8/3');
+    combine(1, '-', 0); // 3 − 8/3 = 1/3
+    combine(3, '/', 0); // 8 ÷ 1/3 = 24
+
+    const result = onSolve.mock.calls[0][0] as Make24Result;
+    expect(result.hintsUsed).toBe(2);
+    expect(result.coinsEarned).toBe(5); // Normal pays 10, halved
+    vi.advanceTimersByTime(700);
+    expect(find('.cse-make24__result-meta').textContent).toContain('2 hints');
+  });
+
+  it('says so when the cards left cannot make 24', () => {
+    mount({ numbers: [6, 6, 6, 6] });
+    combine(0, '*', 1);
+    combine(1, '*', 2); // 216 and 6 left
+    hintButton().click();
+    expect(feedback()).toContain("can't make 24 anymore");
+    expect(hintedSlots()).toEqual([]);
+  });
+
+  it('is turned off once the puzzle is solved', () => {
+    mount({ numbers: [6, 6, 6, 6] });
+    expect(hintButton().disabled).toBe(false);
+    solveSixes();
+    expect(hintButton().disabled).toBe(true);
+  });
+
+  it('does not change the coins when no hint is used', () => {
+    const onSolve = vi.fn();
+    mount({ numbers: [6, 6, 6, 6], onSolve });
+    solveSixes();
+    const result = onSolve.mock.calls[0][0] as Make24Result;
+    expect(result.hintsUsed).toBe(0);
+    expect(result.coinsEarned).toBe(10);
+    vi.advanceTimersByTime(700);
+    expect(find('.cse-make24__result-meta').textContent).not.toContain('hint');
   });
 });

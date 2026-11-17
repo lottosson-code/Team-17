@@ -10,6 +10,8 @@ import { TEX } from './textures';
 // The bubble is a separate object drawn above every enemy body, so a body never hides a problem.
 
 const BUBBLE_GAP = 10;
+/** Lowest y for a bubble's centre, so very tall enemies in the back lanes keep their problem on screen. */
+const BUBBLE_MIN_Y = 32;
 /** Bubbles are drawn above all enemy bodies (which use depths up to about 600). */
 const BUBBLE_DEPTH = 900;
 const WALK_SPEED = 0.011; // Steps per ms, roughly
@@ -103,7 +105,7 @@ export class EnemySprite {
         // Bubbles keep a readable size even in the back lanes.
         const bubbleScale = 0.8 + 0.2 * scale;
         // The bubble moves with its enemy, so both walk in from off screen together.
-        this.bubble.setPosition(x, y - (this.art.height + BUBBLE_GAP) * scale - 26 * bubbleScale)
+        this.bubble.setPosition(x, Math.max(BUBBLE_MIN_Y, y - (this.art.height + BUBBLE_GAP) * scale - 26 * bubbleScale))
             .setScale(bubbleScale).setDepth(BUBBLE_DEPTH + y);
 
         const text = problemText(enemy.problem);

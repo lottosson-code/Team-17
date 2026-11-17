@@ -1,7 +1,16 @@
-/* Modal Overlays (Settings & Quit Confirmation) */
+/* ==========================================================================
+   1. Theme Tokens & Backdrop Overlay
+   ========================================================================== */
 .game-ui-host > .cse-modal-overlay { pointer-events: auto; }
 
 .cse-modal-overlay {
+  --modal-bg: #23352c;
+  --modal-border: #b99c67;
+  --modal-divider: #3a5345;
+  --modal-text-heading: #fff0be;
+  --modal-text-body: #e2dac2;
+  --modal-focus-ring: #fff3b8;
+
   position: absolute;
   inset: 0;
   z-index: 20;
@@ -19,12 +28,15 @@
   to { opacity: 1; transform: scale(1); }
 }
 
+/* ==========================================================================
+   2. Modal Card Container
+   ========================================================================== */
 .cse-modal-card {
-  background: #23352c;
-  border: 4px solid #b99c67;
+  background: var(--modal-bg);
+  border: 4px solid var(--modal-border);
   border-radius: 8px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), inset 0 0 12px rgba(0, 0, 0, 0.35);
-  color: #fff0be;
+  color: var(--modal-text-heading);
   font-family: 'Trebuchet MS', Candara, sans-serif;
   padding: 24px 30px;
   width: 90%;
@@ -32,11 +44,14 @@
   box-sizing: border-box;
 }
 
+/* ==========================================================================
+   3. Header & Close Button
+   ========================================================================== */
 .cse-modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 2px solid #3a5345;
+  border-bottom: 2px solid var(--modal-divider);
   padding-bottom: 12px;
   margin-bottom: 18px;
 }
@@ -45,14 +60,14 @@
   margin: 0;
   font-family: Georgia, 'Palatino Linotype', 'Book Antiqua', serif;
   font-size: 26px;
-  color: #fff0be;
+  color: var(--modal-text-heading);
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .cse-modal-close-btn {
   background: transparent;
   border: none;
-  color: #b99c67;
+  color: var(--modal-border);
   font-size: 20px;
   font-weight: bold;
   cursor: pointer;
@@ -62,10 +77,13 @@
 }
 
 .cse-modal-close-btn:hover {
-  color: #fff0be;
+  color: var(--modal-text-heading);
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* ==========================================================================
+   4. Body & Settings Controls
+   ========================================================================== */
 .cse-modal-body {
   display: flex;
   flex-direction: column;
@@ -74,7 +92,7 @@
 
 .cse-modal-desc {
   font-size: 16px;
-  color: #e2dac2;
+  color: var(--modal-text-body);
   margin: 8px 0 16px;
   line-height: 1.45;
 }
@@ -87,7 +105,7 @@
 }
 
 .cse-settings-row label {
-  color: #fff0be;
+  color: var(--modal-text-heading);
   font-weight: 500;
 }
 
@@ -100,7 +118,7 @@
 
 .cse-settings-slider-wrap input[type="range"] {
   flex: 1;
-  accent-color: #b99c67;
+  accent-color: var(--modal-border);
   cursor: pointer;
 }
 
@@ -115,17 +133,20 @@
 .cse-settings-row--checkbox input[type="checkbox"] {
   width: 22px;
   height: 22px;
-  accent-color: #b99c67;
+  accent-color: var(--modal-border);
   cursor: pointer;
 }
 
+/* ==========================================================================
+   5. Footer & Action Button Variants
+   ========================================================================== */
 .cse-modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
   margin-top: 22px;
   padding-top: 16px;
-  border-top: 2px solid #3a5345;
+  border-top: 2px solid var(--modal-divider);
 }
 
 .cse-modal-btn {
@@ -145,7 +166,7 @@
 
 .cse-modal-btn--primary {
   background: #755638;
-  color: #fff0be;
+  color: var(--modal-text-heading);
 }
 
 .cse-modal-btn--primary:hover {
@@ -154,7 +175,7 @@
 
 .cse-modal-btn--secondary {
   background: #455a4e;
-  color: #e2dac2;
+  color: var(--modal-text-body);
 }
 
 .cse-modal-btn--secondary:hover {
@@ -170,10 +191,13 @@
   background: #a63434;
 }
 
+/* ==========================================================================
+   6. Keyboard Focus Ring
+   ========================================================================== */
 .cse-modal-btn:focus-visible,
 .cse-modal-close-btn:focus-visible,
 .cse-settings-slider-wrap input[type="range"]:focus-visible,
 .cse-settings-row--checkbox input[type="checkbox"]:focus-visible {
-  outline: 2px solid #fff3b8;
+  outline: 2px solid var(--modal-focus-ring);
   outline-offset: 2px;
 }

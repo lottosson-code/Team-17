@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
     createAdditionProblems,
+    createDifferenceOfSquaresProblems,
     createMixedProblems,
     createMultiplicationProblems,
     createTimesTableProblems,
@@ -75,6 +76,35 @@ describe('problem sources', () => {
             expect(Math.max(p.left, p.right)).toBeLessThanOrEqual(11);
         }
         expect(() => next(new Set([0]), [])).toThrow();
+    });
+
+    test('difference-of-squares problems sit either side of a multiple of ten', () => {
+        const next = createDifferenceOfSquaresProblems();
+        const live = new Set<number>();
+        const all: CombatProblem[] = [];
+        // Every answer is different, so 45 draws with growing liveAnswers give each problem once.
+        for (let i = 0; i < 45; i++) {
+            const p = next(live, []);
+            live.add(p.answer);
+            all.push(p);
+        }
+        expect(() => next(live, [])).toThrow();
+        for (const p of all) {
+            const mid = (p.left + p.right) / 2;
+            const d = (p.right - p.left) / 2;
+            expect(p.operator).toBe('*');
+            expect(mid % 10).toBe(0);
+            expect(d).toBeGreaterThanOrEqual(1);
+            expect(d).toBeLessThanOrEqual(9);
+            expect(p.left).toBeGreaterThanOrEqual(41);
+            expect(p.right).toBeLessThanOrEqual(99);
+            expect(p.left % 10).not.toBe(0);
+            expect(p.right % 10).not.toBe(0);
+            expect(p.answer).toBe(mid * mid - d * d);
+        }
+        const texts = all.map(problemText);
+        expect(texts).toContain('48 × 52 = ?');
+        expect(texts).toContain('63 × 77 = ?');
     });
 
     test('mixed problems follow the weights and fall back when a source has no unique problem', () => {

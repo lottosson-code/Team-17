@@ -310,7 +310,8 @@ export class CombatScene extends Phaser.Scene {
           this.wizard.defeat();
           this.hud.showOverlay('lost');
           break;
-        // enemySpawned / newProblem / enemyReachedPlayer / cutsceneEnded: update() picks these up.
+        // enemySpawned / enemySplit / newProblem / enemyReachedPlayer / cutsceneEnded: update() picks these up.
+        // (A split's new enemies get sprites in update(), where the parent stood; its death plays on 'enemyDefeated'.)
       }
     }
   }

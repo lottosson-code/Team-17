@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { CombatModel, SPAWN_CLEARANCE } from '../combat/CombatModel';
 import { createAdditionProblems, createTwistableProblems, createMultiplicationProblems, makeProblem } from '../combat/problems';
 import { MODULE1_LEVEL1, MODULE1_LEVEL2 } from '../combat/levels';
-import type { CombatEvent, CombatProblem, LevelSpec, ProblemSource, SpawnGroup, PowerUpKind } from '../combat/types';
+import { LANE_COUNT } from '../combat/types';
+import type { CombatEvent, CombatProblem, EnemyKind, LevelSpec, ProblemSource, SpawnGroup, PowerUpKind } from '../combat/types';
 
 /** Predictable answers 1, 2, 3, ... skipping any answer already on screen. */
 function countingProblems(): ProblemSource {
@@ -459,6 +460,215 @@ describe('CombatModel cutscenes', () => {
             }],
         }));
         expect(() => model.twistOperators()).toThrow(/duplicate answers/);
+    });
+});
+
+describe('CombatModel splitting', () => {
+    // Always the lowest answer not on screen, so a child WOULD get the parent's answer
+    // if the parent were removed before its children's problems are made.
+    const lowestFree: ProblemSource = live => {
+        let answer = 1;
+        while (live.has(answer)) answer++;
+        return makeProblem(answer, '+', 0);
+    };
+    const kinds: Record<string, EnemyKind> = {
+        big: { id: 'big', maxHp: 10, walkMs: 1000, attackDamage: 10, attackIntervalMs: 500, split: { into: 'small', count: 2 } },
+        small: { id: 'small', maxHp: 10, walkMs: 1000, attackDamage: 5, attackIntervalMs: 500 },
+    };
+    const splitLevel = (overrides: Partial<LevelSpec> = {}) =>
+        level({ playerMaxHp: 1000, problems: lowestFree, enemyKinds: kinds, groups: [trickle(['big'])], ...overrides });
+    const inLanes = (enemy: { lane: number }) => enemy.lane >= 0 && enemy.lane < LANE_COUNT;
+
+    test('a defeated splitting enemy becomes two smaller ones where it stood', () => {
+        const model = create(splitLevel());
+        model.tick(400);
+        const parent = { ...model.getEnemies()[0] };
+        const events = model.submit(parent.problem.answer);
+
+        expect(types(events)).toEqual(['hit', 'enemySplit', 'enemyDefeated']);
+        const children = model.getEnemies();
+        expect(events[1]).toEqual({ type: 'enemySplit', enemyId: parent.id, into: children.map(child => child.id) });
+        expect(children.map(child => child.kind.id)).toEqual(['small', 'small']);
+        for (const child of children) {
+            expect(child.progress).toBe(parent.progress);
+            expect(child.state).toBe('walking');
+        }
+        // One stays in the parent's lane, the other goes to a neighbouring lane.
+        expect(children[0].lane).toBe(parent.lane);
+        expect(Math.abs(children[1].lane - parent.lane)).toBe(1);
+        // Neither gets the answer just typed, nor each other's.
+        expect(new Set([parent.problem.answer, ...children.map(child => child.problem.answer)]).size).toBe(3);
+    });
+
+    test('enemies in the edge lanes still split into valid lanes', () => {
+        for (let seed = 1; seed <= 10; seed++) {
+            // Four at once fill every lane, including both edges.
+            const model = new CombatModel(splitLevel({ groups: [trickle(['big', 'big', 'big', 'big'], { intervalMs: 0 })] }), seededRng(seed));
+            for (const parent of [...model.getEnemies()]) model.submit(parent.problem.answer);
+            expect(model.getEnemies()).toHaveLength(8);
+            expect(model.getEnemies().every(inLanes)).toBe(true);
+        }
+    });
+
+    test('children of an attacking enemy keep attacking, but not on the frame they appear', () => {
+        const model = create(splitLevel());
+        expect(types(model.tick(1000))).toContain('playerDamaged'); // Arrives and attacks
+        model.submit(model.getEnemies()[0].problem.answer);
+        expect(model.getEnemies().every(child => child.state === 'attacking' && child.progress === 1)).toBe(true);
+        expect(types(model.tick(16))).not.toContain('playerDamaged');
+        expect(types(model.tick(500)).filter(type => type === 'playerDamaged')).toHaveLength(2);
+    });
+
+    test('progress and wave markers count every enemy a split will make', () => {
+        const model = create(splitLevel({ groups: [trickle(['big']), wave(['small'])] }));
+        expect(model.getWaveMarkers()).toEqual([3 / 4]); // big + its 2 children come before the wave
+        const progress: number[] = [];
+        let last: CombatEvent[] = [];
+        for (let frame = 0; frame < 1000 && model.getStatus() === 'playing'; frame++) {
+            model.tick(16);
+            if (model.getEnemies().length === 0) continue;
+            last = solveFirst(model);
+            progress.push(model.getProgress());
+        }
+        expect(progress).toEqual([1 / 4, 2 / 4, 3 / 4, 1]);
+        expect(types(last)).toContain('won');
+    });
+
+    test('the eraser mini-boss splits 4 times: 31 enemies, at most 16 at once', () => {
+        const sizes = ['eraser_miniboss', 'eraser_giant', 'eraser_large', 'eraser', 'eraser_baby'];
+        const model = create(level({
+            playerMaxHp: 1000,
+            enemyKinds: MODULE1_LEVEL1.enemyKinds,
+            problems: createAdditionProblems(99),
+            groups: [wave(['eraser_miniboss'])],
+        }));
+        let defeated = 0;
+        let peak = 0;
+        for (let turn = 0; turn < 100 && model.getStatus() === 'playing'; turn++) {
+            const enemies = model.getEnemies();
+            peak = Math.max(peak, enemies.length);
+            // Biggest first, so the screen really fills with 16 babies before any is defeated.
+            // If any problem source ran out of unique answers, submit would throw.
+            const target = enemies.reduce((a, b) => (sizes.indexOf(b.kind.id) < sizes.indexOf(a.kind.id) ? b : a));
+            defeated += types(model.submit(target.problem.answer)).filter(type => type === 'enemyDefeated').length;
+        }
+        expect(model.getStatus()).toBe('won');
+        expect(defeated).toBe(31);
+        expect(peak).toBe(16);
+        expect(model.getProgress()).toBe(1);
+    });
+
+    test('each eraser size gets its own kind of problem', () => {
+        const kinds = MODULE1_LEVEL1.enemyKinds;
+        const draw = (id: string) => Array.from({ length: 300 }, () => kinds[id].ownProblems!()(new Set(), []));
+        for (const id of ['eraser_giant', 'eraser_large', 'eraser']) {
+            const problems = draw(id);
+            for (const p of problems) {
+                expect(p.operator).toBe('*');
+                expect([11, 19]).toContain(p.right); // The pivot
+                expect(p.left).toBeGreaterThanOrEqual(11);
+                expect(p.left).toBeLessThanOrEqual(30);
+            }
+            // Each enemy picks its own pivot, so both turn up.
+            expect(new Set(problems.map(p => p.right))).toEqual(new Set([11, 19]));
+        }
+        for (const p of draw('eraser_baby')) {
+            expect(p.operator).toBe('*');
+            expect(Math.max(p.left, p.right)).toBeLessThanOrEqual(11);
+        }
+        for (const p of draw('eraser_miniboss')) {
+            const mid = (p.left + p.right) / 2;
+            const d = (p.right - p.left) / 2;
+            expect(mid % 10).toBe(0);
+            expect(p.answer).toBe(mid * mid - d * d);
+        }
+    });
+
+    test('no two enemies share an answer while erasers split', () => {
+        const model = new CombatModel(level({
+            playerMaxHp: 100000, // Survive enemies that get through; this test is about answers
+            enemyKinds: MODULE1_LEVEL1.enemyKinds,
+            problems: createAdditionProblems(40, seededRng(42)),
+            groups: [
+                trickle(['eraser', 'pencil', 'eraser_large', ['eraser', 'eraser'], 'eraser_large'], { intervalMs: 3000 }),
+                wave(['eraser_miniboss']),
+            ],
+        }), seededRng(5));
+        const rng = seededRng(7);
+        for (let frame = 0; frame < 20000 && model.getStatus() === 'playing'; frame++) {
+            model.tick(50);
+            const enemies = model.getEnemies();
+            const answers = enemies.map(enemy => enemy.problem.answer);
+            expect(new Set(answers).size).toBe(answers.length);
+            expect(enemies.every(inLanes)).toBe(true);
+            if (enemies.length > 0 && rng() < 0.05) model.submit(enemies[Math.floor(rng() * enemies.length)].problem.answer);
+        }
+        expect(model.getStatus()).toBe('won');
+    });
+
+    test('rejects split data that is unknown, out of range or never ends', () => {
+        const kind = (id: string, split: EnemyKind['split']): EnemyKind =>
+            ({ id, maxHp: 10, walkMs: 1000, attackDamage: 1, attackIntervalMs: 500, split });
+        const withKinds = (extra: Record<string, EnemyKind>) => create(level({ enemyKinds: { ...level().enemyKinds, ...extra } }));
+
+        expect(() => withKinds({ a: kind('a', { into: 'nope', count: 2 }) })).toThrow(/unknown kind "nope"/);
+        expect(() => withKinds({ a: kind('a', { into: 'grunt', count: 0 }) })).toThrow(/1-4 enemies/);
+        expect(() => withKinds({ a: kind('a', { into: 'grunt', count: 5 }) })).toThrow(/1-4 enemies/);
+        expect(() => withKinds({ a: kind('a', { into: 'b', count: 2 }), b: kind('b', { into: 'a', count: 2 }) }))
+            .toThrow(/splits forever: a -> b -> a/);
+    });
+});
+
+describe('CombatModel statistics', () => {
+    test('start at nothing solved, nothing missed and no accuracy yet', () => {
+        expect(create(level()).getStats()).toEqual({ solved: 0, missed: 0, accuracy: null });
+    });
+
+    test('every correct submission counts as solved and every wrong one as missed', () => {
+        // A tank (2 hits) and a grunt appear together; answers are 1 and 2.
+        const model = create(level({ playerMaxHp: 1000, groups: [trickle([['tank', 'grunt']])] }));
+        const tank = model.getEnemies().find(enemy => enemy.kind.id === 'tank')!;
+
+        model.submit(999);
+        expect(types(model.submit(tank.problem.answer))).toEqual(['hit', 'newProblem']); // Survives: still solved
+        model.submit(tank.problem.answer); // Its new problem
+        model.submit(999); // The same wrong answer again counts again
+
+        expect(model.getStats()).toEqual({ solved: 2, missed: 2, accuracy: 0.5 });
+    });
+
+    test('are 100% accurate with no misses and 0% with no correct answers', () => {
+        const perfect = create(level());
+        solveFirst(perfect);
+        expect(perfect.getStats()).toEqual({ solved: 1, missed: 0, accuracy: 1 });
+
+        const wrong = create(level());
+        wrong.submit(999);
+        expect(wrong.getStats()).toEqual({ solved: 0, missed: 1, accuracy: 0 });
+    });
+
+    test('ignore answers during a cutscene and after the level ends', () => {
+        const model = create(level({
+            playerMaxHp: 1000,
+            groups: [
+                trickle(['grunt']),
+                { type: 'finale', enemies: ['grunt'], startDelayMs: 0, intervalMs: 0, cutscene: { id: 'taunt', when: 'beforeSpawn' } },
+            ],
+        }));
+        model.tick(0);
+        solveFirst(model);
+        model.tick(16);
+        expect(model.getStatus()).toBe('cutscene');
+        model.submit(999);
+        expect(model.getStats()).toEqual({ solved: 1, missed: 0, accuracy: 1 });
+
+        model.endCutscene();
+        model.tick(16);
+        solveFirst(model);
+        model.tick(16);
+        expect(model.getStatus()).toBe('won');
+        model.submit(999);
+        expect(model.getStats()).toEqual({ solved: 2, missed: 0, accuracy: 1 });
     });
 });
 

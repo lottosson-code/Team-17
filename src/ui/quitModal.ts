@@ -1,4 +1,8 @@
 import { soundManager } from '../audio/soundManager';
+import {
+  createBaseModal,
+  createModalButton,
+} from './baseModal';
 
 export interface QuitModalOptions {
   onConfirm?: () => void;
@@ -11,147 +15,110 @@ export interface QuitModalController {
   destroy(): void;
 }
 
+/**
+ * Helper to construct standard modal description paragraphs.
+ */
+function createDescription(doc: Document, text: string): HTMLParagraphElement {
+  const desc = doc.createElement('p') as HTMLParagraphElement;
+  desc.className = 'cse-modal-desc';
+  desc.textContent = text;
+  return desc;
+}
+
+/**
+ * Mounts an accessible Quit Game confirmation modal dialog.
+ *
+ * Flow:
+ * 1. Step 1 (Confirmation View): Asks the user to confirm quitting with Cancel and Confirm Quit buttons.
+ * 2. Step 2 (Farewell View): If confirmed, transitions header, body, and footer into a farewell screen
+ *    with a Return to Menu button and dynamic focus updating.
+ *
+ * @param host Parent DOM container to mount into.
+ * @param options Callbacks and lifecycle signal options.
+ * @returns QuitModalController exposing the overlay element and destroy method.
+ */
 export function createQuitModal(
   host: HTMLElement,
   options: QuitModalOptions = {}
 ): QuitModalController {
   const doc = host.ownerDocument;
-  const previousActiveElement = doc.activeElement as HTMLElement | null;
 
-  const overlay = doc.createElement('div');
-  overlay.className = 'cse-modal-overlay';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', 'Quit Game');
-
-  const card = doc.createElement('div');
-  card.className = 'cse-modal-card cse-quit-card';
-
-  // Header
-  const header = doc.createElement('div');
-  header.className = 'cse-modal-header';
-
-  const title = doc.createElement('h2');
-  title.className = 'cse-modal-title';
-  title.textContent = 'Quit Game';
-
-  header.append(title);
-
-  // Body
-  const body = doc.createElement('div');
-  body.className = 'cse-modal-body';
-
-  const desc = doc.createElement('p');
-  desc.className = 'cse-modal-desc';
-  desc.textContent = 'Are you sure you want to quit playing?';
-
-  body.append(desc);
-
-  // Footer
-  const footer = doc.createElement('div');
-  footer.className = 'cse-modal-footer';
-
-  const cancelBtn = doc.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'cse-modal-btn cse-modal-btn--secondary';
-  cancelBtn.textContent = 'Cancel';
-
-  const confirmBtn = doc.createElement('button');
-  confirmBtn.type = 'button';
-  confirmBtn.className = 'cse-modal-btn cse-modal-btn--danger';
-  confirmBtn.textContent = 'Confirm Quit';
-
-  footer.append(cancelBtn, confirmBtn);
-
-  card.append(header, body, footer);
-  overlay.append(card);
-  host.append(overlay);
-
-  let destroyed = false;
-  const destroy = () => {
-    if (destroyed) return;
-    destroyed = true;
-    doc.removeEventListener('keydown', handleKeydown);
-    overlay.remove();
-    if (previousActiveElement && typeof previousActiveElement.focus === 'function') {
-      try {
-        previousActiveElement.focus();
-      } catch {
-        // Safe fallback
-      }
-    }
-  };
-
-  const handleKeydown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      cancel();
-      return;
-    }
-    if (e.key === 'Tab') {
-      const focusable = [cancelBtn, confirmBtn].filter((el) => !el.disabled);
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey && doc.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && doc.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-  };
-
-  const cancel = () => {
-    destroy();
+  let isClosed = false;
+  const cancel = (): void => {
+    if (isClosed) return;
+    isClosed = true;
+    modal.destroy();
     options.onCancel?.();
   };
 
-  if (options.signal) {
-    if (options.signal.aborted) {
-      cancel();
-      return { element: overlay, destroy };
-    }
-    options.signal.addEventListener('abort', () => cancel(), { once: true });
-  }
+  const modal = createBaseModal(host, {
+    ariaLabel: 'Quit Game',
+    title: 'Quit Game',
+    cardClassName: 'cse-quit-card',
+    onDismiss: cancel,
+    signal: options.signal,
+  });
 
-  cancelBtn.onclick = cancel;
-  overlay.onclick = (e: MouseEvent) => {
-    if (e.target === overlay) cancel();
-  };
+  // ---------------------------------------------------------------------------
+  // Step 1: Initial Confirmation View
+  // ---------------------------------------------------------------------------
+  const desc = createDescription(doc, 'Are you sure you want to quit playing?');
+  modal.body.append(desc);
 
-  confirmBtn.onclick = () => {
+  const cancelBtn = createModalButton(doc, {
+    label: 'Cancel',
+    variant: 'secondary',
+    onClick: cancel,
+  });
+
+  const confirmBtn = createModalButton(doc, {
+    label: 'Confirm Quit',
+    variant: 'danger',
+    onClick: () => {
+      showFarewellView();
+    },
+  });
+
+  modal.footer.append(cancelBtn, confirmBtn);
+
+  // ---------------------------------------------------------------------------
+  // Step 2: Farewell View Transition
+  // ---------------------------------------------------------------------------
+  function showFarewellView(): void {
     options.onConfirm?.();
 
-    header.replaceChildren();
-    const farewellTitle = doc.createElement('h2');
-    farewellTitle.className = 'cse-modal-title';
-    farewellTitle.textContent = 'Thanks for Playing!';
-    header.append(farewellTitle);
+    modal.setTitle('Thanks for Playing!');
 
-    body.replaceChildren();
-    const farewellDesc = doc.createElement('p');
-    farewellDesc.className = 'cse-modal-desc';
-    farewellDesc.textContent =
-      'You can safely close this browser window or return to the main menu.';
-    body.append(farewellDesc);
+    modal.body.replaceChildren(
+      createDescription(
+        doc,
+        'You can safely close this browser window or return to the main menu.'
+      )
+    );
 
-    footer.replaceChildren();
-    const returnBtn = doc.createElement('button');
-    returnBtn.type = 'button';
-    returnBtn.className = 'cse-modal-btn cse-modal-btn--primary';
-    returnBtn.textContent = 'Return to Menu';
-    returnBtn.onclick = () => {
-      soundManager.playSfx('click');
-      cancel();
-    };
-    footer.append(returnBtn);
+    const returnBtn = createModalButton(doc, {
+      label: 'Return to Menu',
+      variant: 'primary',
+      onClick: () => {
+        soundManager.playSfx('click');
+        cancel();
+      },
+    });
+
+    modal.footer.replaceChildren(returnBtn);
     returnBtn.focus();
+  }
+
+  // Defensive: set initial focus on Cancel to avoid accidental confirmations
+  if (!options.signal?.aborted) {
+    cancelBtn.focus();
+  }
+
+  return {
+    element: modal.overlay,
+    destroy: () => {
+      isClosed = true;
+      modal.destroy();
+    },
   };
-
-  doc.addEventListener('keydown', handleKeydown);
-  cancelBtn.focus();
-
-  return { element: overlay, destroy };
 }
