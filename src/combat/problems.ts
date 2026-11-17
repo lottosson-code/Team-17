@@ -3,7 +3,8 @@ import type { CombatProblem, Operator, ProblemSource } from './types';
 // Combat-side problem sources. TEMPORARY until src/Math/ProblemGenerator supports
 // per-level ranges and on-screen answer checks; then these should wrap it instead.
 
-const SYMBOLS: Record<Operator, string> = { '+': '+', '-': '−', '*': '×', '/': '÷' };
+const SYMBOLS: Record<Operator, string> = { '+': '+', '-': '−', '*': '×', '/': '÷',
+                                            '%': 'R', '//': '//'};
 
 export function compute(left: number, operator: Operator, right: number): number {
     switch (operator) {
@@ -11,6 +12,8 @@ export function compute(left: number, operator: Operator, right: number): number
         case '-': return left - right;
         case '*': return left * right;
         case '/': return left / right;
+        case '%': return left % right;
+        case '//': return left / right;
     }
 }
 
@@ -50,6 +53,39 @@ export function createZeroProblems(max = 11, rng: () => number = Math.random): P
         const other = 1 + Math.floor(rng() * max);
         return rng() < 0.5 ? makeProblem(0, '*', other) : makeProblem(other, '*', 0);
     };
+}
+// Modulus where max is the maximum multiplier used when generating random numbers
+// maxAnswer must be less than max or an error will be thrown.
+export function createRemainderProblems(maxAnswer = 10, max = 12, 
+                                        rng: () => number = Math.random): ProblemSource {
+    return liveAnswers => {
+        if (maxAnswer > max) throw new Error(`Max Answer ${maxAnswer} is larger than max ${max}`);
+        const free: number[] = [];
+        for (let answer = 0; answer <= maxAnswer; answer++) {
+            if (!liveAnswers.has(answer)) free.push(answer);
+        }
+        if (free.length === 0) throw new Error(`No free remainder answer up to ${maxAnswer}`);
+        const answer = pick(free, rng);
+        const right = 1 + answer + Math.floor(rng() * (max-answer));
+        const left = right * Math.floor(rng() * max) + answer;
+        return makeProblem(left, '%', right);
+    }
+}
+
+// Creates a division problem where the answer is the floor or whole number component
+export function createFloorProblem(maxAnswer = 20, max = 12, 
+                                   rng: () => number = Math.random): ProblemSource {
+    return liveAnswers => {
+        const free: number[] = [];
+        for (let answer = 0; answer <= maxAnswer; answer++) {
+            if (!liveAnswers.has(answer)) free.push(answer);
+        }
+        if (free.length === 0) throw new Error(`No free floor answer up to ${maxAnswer}`);
+        const answer = pick(free, rng);
+        const right = 1 + Math.floor(rng() * max);
+        const left = right * answer + Math.floor(rng() * (right));
+        return makeProblem(left, '//', right);
+    }
 }
 
 /**

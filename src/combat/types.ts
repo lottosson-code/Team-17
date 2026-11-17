@@ -1,6 +1,6 @@
 export const LANE_COUNT = 4;
 
-export type Operator = '+' | '-' | '*' | '/';
+export type Operator = '+' | '-' | '*' | '/' | '%' | '//';
 
 // Problem shown above an enemy. "answer" must be unique among enemies on screen.
 export interface CombatProblem {
