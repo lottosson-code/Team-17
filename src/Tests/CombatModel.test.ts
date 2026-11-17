@@ -619,6 +619,59 @@ describe('CombatModel splitting', () => {
     });
 });
 
+describe('CombatModel statistics', () => {
+    test('start at nothing solved, nothing missed and no accuracy yet', () => {
+        expect(create(level()).getStats()).toEqual({ solved: 0, missed: 0, accuracy: null });
+    });
+
+    test('every correct submission counts as solved and every wrong one as missed', () => {
+        // A tank (2 hits) and a grunt appear together; answers are 1 and 2.
+        const model = create(level({ playerMaxHp: 1000, groups: [trickle([['tank', 'grunt']])] }));
+        const tank = model.getEnemies().find(enemy => enemy.kind.id === 'tank')!;
+
+        model.submit(999);
+        expect(types(model.submit(tank.problem.answer))).toEqual(['hit', 'newProblem']); // Survives: still solved
+        model.submit(tank.problem.answer); // Its new problem
+        model.submit(999); // The same wrong answer again counts again
+
+        expect(model.getStats()).toEqual({ solved: 2, missed: 2, accuracy: 0.5 });
+    });
+
+    test('are 100% accurate with no misses and 0% with no correct answers', () => {
+        const perfect = create(level());
+        solveFirst(perfect);
+        expect(perfect.getStats()).toEqual({ solved: 1, missed: 0, accuracy: 1 });
+
+        const wrong = create(level());
+        wrong.submit(999);
+        expect(wrong.getStats()).toEqual({ solved: 0, missed: 1, accuracy: 0 });
+    });
+
+    test('ignore answers during a cutscene and after the level ends', () => {
+        const model = create(level({
+            playerMaxHp: 1000,
+            groups: [
+                trickle(['grunt']),
+                { type: 'finale', enemies: ['grunt'], startDelayMs: 0, intervalMs: 0, cutscene: { id: 'taunt', when: 'beforeSpawn' } },
+            ],
+        }));
+        model.tick(0);
+        solveFirst(model);
+        model.tick(16);
+        expect(model.getStatus()).toBe('cutscene');
+        model.submit(999);
+        expect(model.getStats()).toEqual({ solved: 1, missed: 0, accuracy: 1 });
+
+        model.endCutscene();
+        model.tick(16);
+        solveFirst(model);
+        model.tick(16);
+        expect(model.getStatus()).toBe('won');
+        model.submit(999);
+        expect(model.getStats()).toEqual({ solved: 2, missed: 0, accuracy: 1 });
+    });
+});
+
 describe('MODULE1_LEVEL1', () => {
     test('is 4 trickle, a wave of 4, 6 faster trickle, a wave of 6, then the boss finale', () => {
         const groups = MODULE1_LEVEL1.groups;
