@@ -3,6 +3,7 @@ import {
     LANE_COUNT,
     type CombatEvent,
     type CombatProblem,
+    type CombatStats,
     type CombatStatus,
     type CutsceneSpec,
     type Enemy,
@@ -40,6 +41,8 @@ export class CombatModel {
     private enemies: Enemy[] = [];
     private nextEnemyId = 1;
     private defeatedCount = 0;
+    private solvedCount = 0; // Correct answers
+    private missedCount = 0; // Wrong answers
 
     private groupIndex = 0;
     private groupStarted = false;
@@ -90,7 +93,11 @@ export class CombatModel {
         if (this.status !== 'playing') return [];
 
         const target = this.enemies.find(enemy => enemy.problem.answer === answer);
-        if (!target) return [{ type: 'wrongAnswer', answer }];
+        if (!target) {
+            this.missedCount++;
+            return [{ type: 'wrongAnswer', answer }];
+        }
+        this.solvedCount++;
 
         const events: CombatEvent[] = [];
         const damage = this.level.damagePerHit;
@@ -173,6 +180,16 @@ export class CombatModel {
     /** Level progress from 0 to 1: the share of all the level's enemies defeated. */
     public getProgress(): number {
         return this.defeatedCount / this.totalEnemies;
+    }
+
+    /** Answers so far: correct, wrong, and the share that were correct. */
+    public getStats(): CombatStats {
+        const answered = this.solvedCount + this.missedCount;
+        return {
+            solved: this.solvedCount,
+            missed: this.missedCount,
+            accuracy: answered === 0 ? null : this.solvedCount / answered,
+        };
     }
 
     /** Where each wave's skull sits on the progress bar (0-1), in order. */
