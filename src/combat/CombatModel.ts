@@ -6,6 +6,7 @@ import {
     type CombatStatus,
     type CutsceneSpec,
     type Enemy,
+    type EnemyKind,
     type LevelSpec,
     type ProblemSource,
     type SpawnGroup,
@@ -25,6 +26,9 @@ export const SPAWN_CLEARANCE = 0.12;
  * Cutscenes: when a 'finale' group starts (when: 'beforeSpawn') or once its enemies have
  * appeared (default), status becomes 'cutscene' and time stops. The scene plays the animation, calls `twistOperators()` if the cutscene has
  * a twist, then `endCutscene()` to resume play.
+ *
+ * Splitting: a defeated enemy whose kind has `split` is replaced by smaller enemies where it
+ * stood (see split()). They count towards progress like any other enemy.
  */
 export class CombatModel {
     private readonly level: LevelSpec;
@@ -53,7 +57,7 @@ export class CombatModel {
         this.level = level;
         this.rng = rng;
         this.playerHp = level.playerMaxHp;
-        this.totalEnemies = level.groups.reduce((sum, group) => sum + countEnemies(group), 0);
+        this.totalEnemies = level.groups.reduce((sum, group) => sum + countEnemies(group, level.enemyKinds), 0);
         // Groups with no start delay spawn immediately rather than one frame later.
         this.advanceSpawning(0, this.pending);
     }
@@ -94,6 +98,8 @@ export class CombatModel {
         events.push({ type: 'hit', enemyId: target.id, damage });
 
         if (target.hp === 0) {
+            // Split first, while it is still on screen, so no new enemy gets the answer just typed.
+            this.split(target, events);
             this.enemies = this.enemies.filter(enemy => enemy !== target);
             this.defeatedCount++;
             events.push({ type: 'enemyDefeated', enemyId: target.id });
@@ -175,7 +181,7 @@ export class CombatModel {
         let before = 0;
         for (const group of this.level.groups) {
             if (group.type === 'wave') markers.push(before / this.totalEnemies);
-            before += countEnemies(group);
+            before += countEnemies(group, this.level.enemyKinds);
         }
         return markers;
     }
@@ -277,11 +283,47 @@ export class CombatModel {
     private spawn(group: SpawnGroup, kindId: string, lane: number, events: CombatEvent[]): void {
         const kind = this.level.enemyKinds[kindId];
         const problems = kind.ownProblems?.() ?? group.problems ?? this.level.problems;
+        const enemy = this.addEnemy(kind, lane, 0, problems);
+        events.push({ type: 'enemySpawned', enemyId: enemy.id });
+    }
+
+    /**
+     * A defeated enemy whose kind has `split` becomes `count` smaller enemies where it stood:
+     * one in its own lane and the rest in the nearest lanes, at the same progress.
+     * Call it while the parent is still in `enemies`, so no child gets the parent's answer.
+     */
+    private split(parent: Enemy, events: CombatEvent[]): void {
+        if (!parent.kind.split) return;
+        const kind = this.level.enemyKinds[parent.kind.split.into];
+        const ids: number[] = [];
+        for (const lane of this.splitLanes(parent.lane, parent.kind.split.count)) {
+            // Each child joins `enemies` before the next one's problem is made, so their answers differ.
+            const child = this.addEnemy(kind, lane, parent.progress, kind.ownProblems?.() ?? parent.problems);
+            if (parent.state === 'attacking') {
+                // Already at the wizard: the first attack comes after a full interval, not this frame.
+                child.state = 'attacking';
+                child.attackCooldownMs = kind.attackIntervalMs;
+            }
+            ids.push(child.id);
+        }
+        events.push({ type: 'enemySplit', enemyId: parent.id, into: ids });
+    }
+
+    /** Lanes for a split: the parent's own lane, then the nearest others, starting on a random side. */
+    private splitLanes(lane: number, count: number): number[] {
+        const side = this.rng() < 0.5 ? -1 : 1;
+        const lanes = [lane];
+        for (let step = 1; step < LANE_COUNT; step++) lanes.push(lane + side * step, lane - side * step);
+        return lanes.filter(l => l >= 0 && l < LANE_COUNT).slice(0, count);
+    }
+
+    /** Puts a new enemy on the field, with a problem whose answer is not on screen yet. */
+    private addEnemy(kind: EnemyKind, lane: number, progress: number, problems: ProblemSource): Enemy {
         const enemy: Enemy = {
             id: this.nextEnemyId++,
             kind,
             lane,
-            progress: 0,
+            progress,
             hp: kind.maxHp,
             problem: this.createProblem(problems),
             problems,
@@ -289,7 +331,7 @@ export class CombatModel {
             attackCooldownMs: 0,
         };
         this.enemies.push(enemy);
-        events.push({ type: 'enemySpawned', enemyId: enemy.id });
+        return enemy;
     }
 
     private advanceEnemy(enemy: Enemy, dtMs: number, events: CombatEvent[]): void {
@@ -346,8 +388,15 @@ function asList(entry: string | string[]): string[] {
     return typeof entry === 'string' ? [entry] : entry;
 }
 
-function countEnemies(group: SpawnGroup): number {
-    return group.enemies.reduce((sum, entry) => sum + asList(entry).length, 0);
+/** How many enemies a group adds up to, counting everything its enemies split into. */
+function countEnemies(group: SpawnGroup, kinds: Record<string, EnemyKind>): number {
+    return group.enemies.flatMap(asList).reduce((sum, kindId) => sum + enemyWeight(kinds, kindId), 0);
+}
+
+/** One enemy of this kind, plus everything it splits into, all the way down. */
+function enemyWeight(kinds: Record<string, EnemyKind>, kindId: string): number {
+    const split = kinds[kindId].split;
+    return split ? 1 + split.count * enemyWeight(kinds, split.into) : 1;
 }
 
 /** Gap before the next entry, after `spawned` entries of the group have appeared. */
@@ -365,6 +414,23 @@ function validateLevel(level: LevelSpec): void {
     for (const [id, kind] of Object.entries(level.enemyKinds)) {
         if (kind.maxHp <= 0 || kind.walkMs <= 0 || kind.attackIntervalMs <= 0) {
             throw new Error(`Enemy kind "${id}" needs positive maxHp, walkMs and attackIntervalMs`);
+        }
+        if (kind.split) {
+            const { into, count } = kind.split;
+            if (!level.enemyKinds[into]) throw new Error(`Enemy kind "${id}" splits into unknown kind "${into}"`);
+            if (!Number.isInteger(count) || count < 1 || count > LANE_COUNT) {
+                throw new Error(`Enemy kind "${id}" must split into 1-${LANE_COUNT} enemies`);
+            }
+        }
+    }
+    // Every split chain must end, or the level could never be won (and counting enemies would never finish).
+    for (const id of Object.keys(level.enemyKinds)) {
+        const chain: string[] = [];
+        let at: string | undefined = id;
+        while (at !== undefined) {
+            if (chain.includes(at)) throw new Error(`Enemy kind "${id}" splits forever: ${[...chain, at].join(' -> ')}`);
+            chain.push(at);
+            at = level.enemyKinds[at].split?.into;
         }
     }
     level.groups.forEach((group, g) => {

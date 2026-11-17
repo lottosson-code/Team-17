@@ -52,6 +52,36 @@ export function createZeroProblems(max = 11, rng: () => number = Math.random): P
     };
 }
 
+// multiplication of a two-digit (>10) number by "pivot". max specifies the maximum two-digit number.
+export function createPivotProblems(pivot: number, max = 30, rng: () => number = Math.random): ProblemSource {
+    return liveAnswers => {
+        const free: number[] = [];
+        for (let number = 11; number <= max; number++) {
+            if (!liveAnswers.has(number * pivot)){
+                free.push(number);
+            }
+        }
+        if (free.length === 0) throw new Error(`No free pivot problem up to ${max}`);
+        const number = pick(free, rng);
+        return makeProblem(number, '*', pivot);
+    };
+}
+
+/**
+ * a × b where a and b are the same distance d either side of a multiple of ten m, so the
+ * answer is quick by difference of squares: a × b = m² − d², e.g. 63 × 77 = 70² − 7² = 4851.
+ * Both numbers are from min to max and neither is a multiple of ten, so d is 1 to 9.
+ * With the defaults (41-99) the midpoint is 50, 60, 70, 80 or 90: 45 different problems.
+ */
+export function createDifferenceOfSquaresProblems(min = 41, max = 99, rng: () => number = Math.random): ProblemSource {
+    return liveAnswers => pickPair(min, max, '*', rng, (left, right) =>
+        left < right
+        && (left + right) % 20 === 0 // The midpoint m is a multiple of ten
+        && right - left < 20 // d = 1 to 9
+        && left % 10 !== 0 && right % 10 !== 0
+        && !liveAnswers.has(left * right));
+}
+
 /**
  * Picks one of several sources at random by weight. If the picked source can't produce a
  * unique problem (it throws), the others are tried, so e.g. a second "× 0" becomes another kind.

@@ -5,8 +5,14 @@ import {
     createTimesTableProblems,
     createTwistableProblems,
     createZeroProblems,
+    createPivotProblems,
+    createDifferenceOfSquaresProblems,
 } from './problems';
-import type { EnemyKind, LevelSpec } from './types';
+import type { EnemyKind, LevelSpec, ProblemSource } from './types';
+
+// A two-digit number (11-30) × a pivot of 11 or 19. Used as ownProblems, so each enemy picks its own pivot.
+const PIVOTS = [11, 19];
+const randomPivotProblems = (): ProblemSource => createPivotProblems(PIVOTS[Math.floor(Math.random() * PIVOTS.length)]);
 
 const ENEMY_KINDS: Record<string, EnemyKind> = {
     pencil: { id: 'pencil', maxHp: 10, walkMs: 20000, attackDamage: 10, attackIntervalMs: 2000 },
@@ -15,6 +21,36 @@ const ENEMY_KINDS: Record<string, EnemyKind> = {
     miniBoss: {
         id: 'miniBoss', maxHp: 160, walkMs: 60000, attackDamage: 30, attackIntervalMs: 2500,
         ownProblems: createTimesTableProblems([7, 8, 9], 16),
+    },
+    // Erasers split in two when defeated, and each size is its own kind. The mini-boss splits 4 times:
+    // eraser_miniboss -> 2 giant -> 4 large -> 8 eraser -> 16 baby = 31 enemies, at most 16 at once.
+    // Smaller erasers walk faster. Problems: difference of squares for the mini-boss, pivot problems
+    // for giant, large and regular erasers, level 2's easy multiplication for babies.
+    // Stats and problems are first guesses; tune them while playtesting.
+    eraser_miniboss: {
+        id: 'eraser_miniboss', maxHp: 10, walkMs: 80000, attackDamage: 40, attackIntervalMs: 2500,
+        ownProblems: () => createDifferenceOfSquaresProblems(),
+        split: { into: 'eraser_giant', count: 2 },
+    },
+    eraser_giant: {
+        id: 'eraser_giant', maxHp: 10, walkMs: 60000, attackDamage: 25, attackIntervalMs: 2500,
+        ownProblems: randomPivotProblems,
+        split: { into: 'eraser_large', count: 2 },
+    },
+    eraser_large: {
+        id: 'eraser_large', maxHp: 10, walkMs: 50000, attackDamage: 15, attackIntervalMs: 2000,
+        ownProblems: randomPivotProblems,
+        split: { into: 'eraser', count: 2 },
+    },
+    // A regular eraser: put it in any group and it splits once.
+    eraser: {
+        id: 'eraser', maxHp: 10, walkMs: 35000, attackDamage: 10, attackIntervalMs: 2000,
+        ownProblems: randomPivotProblems,
+        split: { into: 'eraser_baby', count: 2 },
+    },
+    eraser_baby: {
+        id: 'eraser_baby', maxHp: 10, walkMs: 20000, attackDamage: 5, attackIntervalMs: 1500,
+        ownProblems: () => createMultiplicationProblems(1, 11),
     },
 };
 
@@ -131,6 +167,62 @@ export const MODULE1_LEVEL2: LevelSpec = {
     ],
 };
 
+/**
+ * Module 1, Level 3: erasers. Pencils and textbooks get mostly 6-12 × 6-12; erasers bring pivot
+ * problems (11-30 × 11 or 19) and split into babies with 1-11 × 1-11.
+ * trickle -> wave 1 -> trickle -> wave 2 -> the eraser mini-boss (no cutscene), which splits 4 times.
+ * The progress bar counts every enemy the erasers split into.
+ * Enemy mix, timings and problem weights are first guesses; tune them while playtesting.
+ */
+export const MODULE1_LEVEL3: LevelSpec = {
+    playerMaxHp: 100,
+    damagePerHit: 10,
+    problems: createMixedProblems([
+        { source: createMultiplicationProblems(6, 12), weight: 80 },
+        { source: createAdditionProblems(99), weight: 15 },
+        { source: createZeroProblems(11), weight: 5 },
+    ]),
+    enemyKinds: ENEMY_KINDS,
+    groups: [
+        {
+            type: 'trickle',
+            enemies: ['pencil', ['pencil', 'textbook'], ['pencil', 'pencil'], 'eraser', ['pencil', 'pencil', 'pencil'], 
+                      'textbook', 'eraser', ['pencil', 'textbook'], ['pencil', 'eraser']],
+            startDelayMs: 5000,
+            intervalMs: 3500,
+            endIntervalMs: 3500,
+        },
+        {
+            type: 'wave',
+            enemies: ['pencil', 'eraser', 'textbook', 'pencil', 'textbook', 'eraser', 'pencil'],
+            startDelayMs: 3000,
+            intervalMs: 600,
+        },
+        {
+            type: 'trickle',
+            enemies: [
+                'pencil', ['pencil', 'pencil'], 'textbook', 'eraser', ['pencil', 'eraser'],
+                'textbook', ['pencil', 'pencil', 'textbook'], 'eraser', ['pencil', 'textbook'], ['eraser', 'eraser']
+            ],
+            startDelayMs: 4000,
+            intervalMs: 4000,
+            endIntervalMs: 3000,
+        },
+        {
+            type: 'wave',
+            enemies: ['pencil', 'pencil', 'textbook', 'eraser', 'pencil', 'eraser', 'textbook', 'eraser', 'pencil', 'eraser'],
+            startDelayMs: 3000,
+            intervalMs: 600,
+        },
+        {
+            type: 'finale',
+            enemies: ['eraser_miniboss'],
+            startDelayMs: 600,
+            intervalMs: 0,
+        },
+    ],
+};
+
 /** Short level for quick manual testing. */
 export const TEST_LEVEL: LevelSpec = {
     playerMaxHp: 100,
@@ -145,6 +237,7 @@ export const TEST_LEVEL: LevelSpec = {
 const LEVELS: Record<string, LevelSpec> = {
     '1-1': MODULE1_LEVEL1,
     '1-2': MODULE1_LEVEL2,
+    '1-3': MODULE1_LEVEL3,
 };
 
 /** The level for a map selection; falls back to TEST_LEVEL for levels not designed yet. */
