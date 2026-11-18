@@ -142,91 +142,131 @@ export class SoundManager {
     }
   }
 
-  private synthesizeHover(now: number): void {
-    if (!this.ctx || !this.sfxGainNode) return;
+  /**
+   * Helper to synthesize a single timed oscillator tone through a dedicated gain envelope.
+   *
+   * @param options Sound configuration:
+   *  - type: Waveform ('sine', 'triangle', 'square', 'sawtooth')
+   *  - startFreq: Frequency at the start of the note in Hertz
+   *  - endFreq: Optional frequency to smoothly glide to by the end of the duration
+   *  - startTime: AudioContext timestamp when this tone begins playing
+   *  - duration: Length of the tone in seconds
+   *  - peakGain: Volume peak reached at startTime (0.0 to 1.0)
+   *  - endGain: Volume reached at the end of the duration (defaults to 0.001 to prevent audio popping)
+   */
+  private playSfxTone(options: {
+    type: OscillatorType;
+    startFreq: number;
+    endFreq?: number;
+    startTime: number;
+    duration: number;
+    peakGain: number;
+    endGain?: number;
+  }): void {
+    if (!this.ctx || !this.sfxGainNode) {
+      return;
+    }
+
+    const type = options.type;
+    const startFreq = options.startFreq;
+    const endFreq = options.endFreq;
+    const startTime = options.startTime;
+    const duration = options.duration;
+    const peakGain = options.peakGain;
+    // In Web Audio API, exponential ramps cannot target 0 (it throws an error or breaks the curve).
+    // 0.001 represents near-silence (-60dB) and creates a clean, pop-free fade out.
+    let endGain = 0.001;
+    if (options.endGain !== undefined) {
+      endGain = options.endGain;
+    }
+
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, now);
+    osc.type = type;
+    osc.frequency.setValueAtTime(startFreq, startTime);
+    if (endFreq !== undefined) {
+      // Smooth pitch bend / frequency slide
+      osc.frequency.exponentialRampToValueAtTime(endFreq, startTime + duration);
+    }
 
-    gain.gain.setValueAtTime(0.35, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    // Set peak volume at start, then ramp down smoothly according to duration
+    gain.gain.setValueAtTime(peakGain, startTime);
+    gain.gain.exponentialRampToValueAtTime(endGain, startTime + duration);
 
+    // Wire: Oscillator -> Tone Gain Envelope -> Master SFX Gain -> Destination
     osc.connect(gain);
     gain.connect(this.sfxGainNode);
 
-    osc.start(now);
-    osc.stop(now + 0.045);
+    osc.start(startTime);
+    // Add 5ms buffer so the exponential decay finishes before cutting off the oscillator
+    osc.stop(startTime + duration + 0.005);
+  }
+
+  private synthesizeHover(now: number): void {
+    this.playSfxTone({
+      type: 'sine',
+      startFreq: 880,
+      startTime: now,
+      duration: 0.04,
+      peakGain: 0.35,
+      endGain: 0.001,
+    });
   }
 
   private synthesizeClick(now: number): void {
-    if (!this.ctx || !this.sfxGainNode) return;
     // Two-tone chime (523Hz -> 784Hz)
-    const osc1 = this.ctx.createOscillator();
-    const gain1 = this.ctx.createGain();
-    osc1.type = 'triangle';
-    osc1.frequency.setValueAtTime(523.25, now);
-    gain1.gain.setValueAtTime(0.4, now);
-    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
-    osc1.connect(gain1);
-    gain1.connect(this.sfxGainNode);
-    osc1.start(now);
-    osc1.stop(now + 0.045);
-
-    const osc2 = this.ctx.createOscillator();
-    const gain2 = this.ctx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(783.99, now + 0.04);
-    gain2.gain.setValueAtTime(0.5, now + 0.04);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-    osc2.connect(gain2);
-    gain2.connect(this.sfxGainNode);
-    osc2.start(now + 0.04);
-    osc2.stop(now + 0.095);
+    this.playSfxTone({
+      type: 'triangle',
+      startFreq: 523.25,
+      startTime: now,
+      duration: 0.04,
+      peakGain: 0.4,
+      endGain: 0.01,
+    });
+    this.playSfxTone({
+      type: 'sine',
+      startFreq: 783.99,
+      startTime: now + 0.04,
+      duration: 0.05,
+      peakGain: 0.5,
+      endGain: 0.001,
+    });
   }
 
   private synthesizeStart(now: number): void {
-    if (!this.ctx || !this.sfxGainNode) return;
     // Ascending 3-note heroic RPG arpeggio (C5 -> E5 -> G5)
     const notes = [523.25, 659.25, 783.99];
     notes.forEach((freq, idx) => {
-      if (!this.ctx || !this.sfxGainNode) return;
-      const noteTime = now + idx * 0.11;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
+      // The final resolved chord note (idx === 2) uses a richer triangle wave and rings out longer (0.22s)
+      let waveType: OscillatorType = 'sine';
+      let noteDuration = 0.12;
+      if (idx === 2) {
+        waveType = 'triangle';
+        noteDuration = 0.22;
+      }
 
-      osc.type = idx === 2 ? 'triangle' : 'sine';
-      osc.frequency.setValueAtTime(freq, noteTime);
-
-      gain.gain.setValueAtTime(0.45, noteTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, noteTime + (idx === 2 ? 0.22 : 0.12));
-
-      osc.connect(gain);
-      gain.connect(this.sfxGainNode);
-
-      osc.start(noteTime);
-      osc.stop(noteTime + 0.24);
+      this.playSfxTone({
+        type: waveType,
+        startFreq: freq,
+        startTime: now + idx * 0.11,
+        duration: noteDuration,
+        peakGain: 0.45,
+        endGain: 0.001,
+      });
     });
   }
 
   private synthesizePitchSlide(now: number, fromFreq: number, toFreq: number, duration: number): void {
-    if (!this.ctx || !this.sfxGainNode) return;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(fromFreq, now);
-    osc.frequency.exponentialRampToValueAtTime(toFreq, now + duration);
-
-    gain.gain.setValueAtTime(0.3, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGainNode);
-
-    osc.start(now);
-    osc.stop(now + duration + 0.01);
+    this.playSfxTone({
+      type: 'sine',
+      startFreq: fromFreq,
+      endFreq: toFreq,
+      startTime: now,
+      duration,
+      peakGain: 0.3,
+      endGain: 0.001,
+    });
   }
 
   /**

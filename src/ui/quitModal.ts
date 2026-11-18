@@ -5,8 +5,12 @@ import {
 } from './baseModal';
 
 export interface QuitModalOptions {
+  // Called when the user confirms they want to quit (clicked "Confirm Quit").
+  // Optional because some callers (like the standalone preview) don't need it.
   onConfirm?: () => void;
+  // Called when the user backs out (Cancel, Escape, backdrop click, etc.).
   onCancel?: () => void;
+  // If the parent scene dies, this signal fires and auto-closes the modal.
   signal?: AbortSignal;
 }
 
@@ -43,14 +47,22 @@ export function createQuitModal(
 ): QuitModalController {
   const doc = host.ownerDocument;
 
+  // `isClosed` prevents cancel() from running twice if multiple dismiss paths fire
+  // at the same time (e.g., Escape key + backdrop click in quick succession).
   let isClosed = false;
+  // cancel() = tear everything down and tell the caller "user bailed out."
   const cancel = (): void => {
     if (isClosed) return;
     isClosed = true;
     modal.destroy();
-    options.onCancel?.();
+    // If the caller provided an onCancel callback, fire it. If not, just do nothing.
+    if (options.onCancel) {
+      options.onCancel();
+    }
   };
 
+  // Hand off all the boilerplate (overlay, focus trap, Escape, backdrop, ARIA)
+  // to the shared base modal — we just configure it with our title and hook up cancel.
   const modal = createBaseModal(host, {
     ariaLabel: 'Quit Game',
     title: 'Quit Game',
@@ -74,6 +86,8 @@ export function createQuitModal(
   const confirmBtn = createModalButton(doc, {
     label: 'Confirm Quit',
     variant: 'danger',
+    // When the user clicks "Confirm Quit", swap the entire modal content
+    // from the confirmation view to a farewell screen.
     onClick: () => {
       showFarewellView();
     },
@@ -85,10 +99,15 @@ export function createQuitModal(
   // Step 2: Farewell View Transition
   // ---------------------------------------------------------------------------
   function showFarewellView(): void {
-    options.onConfirm?.();
+    // Let the caller know the user confirmed (MainMenuScene uses this to play a sound).
+    if (options.onConfirm) {
+      options.onConfirm();
+    }
 
+    // Swap out the header, body, and footer content in-place.
     modal.setTitle('Thanks for Playing!');
 
+    // replaceChildren wipes the old content and puts the new description in.
     modal.body.replaceChildren(
       createDescription(
         doc,
@@ -109,8 +128,10 @@ export function createQuitModal(
     returnBtn.focus();
   }
 
-  // Defensive: set initial focus on Cancel to avoid accidental confirmations
-  if (!options.signal?.aborted) {
+  // Defensive: set initial focus on Cancel to avoid accidental confirmations.
+  // Check that the scene hasn't already aborted before focusing.
+  const hasAborted = options.signal ? options.signal.aborted : false;
+  if (!hasAborted) {
     cancelBtn.focus();
   }
 
