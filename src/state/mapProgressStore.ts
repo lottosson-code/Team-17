@@ -43,112 +43,118 @@ export const MODULE_THEMES: Record<number, ModuleTheme> = {
 
 export const MAP_PROGRESS_STORAGE_KEY = 'team17_math_rpg_map_progress_v1';
 
+interface NodeTemplate {
+  label: string;
+  x: number;
+  y: number;
+  /** Same-module levelIds unlocked upon completing this node. */
+  sameModuleUnlocks: number[];
+  /** Whether completing this node unlocks Level 1 of the next module (if moduleId < 3). */
+  unlocksNextModule?: boolean;
+  prerequisiteDescription: (moduleId: number) => string;
+}
+
+const NODE_TEMPLATES: Record<number, NodeTemplate> = {
+  1: {
+    label: 'Level 1',
+    x: 220,
+    y: 380,
+    sameModuleUnlocks: [2],
+    prerequisiteDescription: (moduleId) => {
+      if (moduleId === 1) {
+        return 'Unlocked by default';
+      }
+      return `Complete Module ${moduleId - 1} — Level 5 first`;
+    },
+  },
+  2: {
+    label: 'Level 2',
+    x: 500,
+    y: 240,
+    sameModuleUnlocks: [3],
+    prerequisiteDescription: () => 'Complete Level 1 first',
+  },
+  3: {
+    label: 'Level 3',
+    x: 500,
+    y: 520,
+    sameModuleUnlocks: [4, 6],
+    prerequisiteDescription: () => 'Complete Level 2 first',
+  },
+  4: {
+    label: 'Level 4',
+    x: 790,
+    y: 380,
+    sameModuleUnlocks: [5],
+    prerequisiteDescription: () => 'Complete Level 3 first',
+  },
+  5: {
+    label: 'Level 5 (Boss)',
+    x: 1060,
+    y: 380,
+    sameModuleUnlocks: [],
+    unlocksNextModule: true,
+    prerequisiteDescription: () => 'Complete Level 4 first',
+  },
+  6: {
+    label: 'Minigame 1',
+    x: 320,
+    y: 560,
+    sameModuleUnlocks: [7],
+    prerequisiteDescription: () => 'Complete Level 3 first',
+  },
+  7: {
+    label: 'Minigame 2',
+    x: 640,
+    y: 570,
+    sameModuleUnlocks: [8],
+    prerequisiteDescription: () => 'Complete Minigame 1 first',
+  },
+  8: {
+    label: 'Minigame 3',
+    x: 960,
+    y: 600,
+    sameModuleUnlocks: [],
+    prerequisiteDescription: () => 'Complete Minigame 2 first',
+  },
+};
+
 export function getLevelNodeDefinition(moduleId: number, levelId: number): LevelNodeDefinition {
-  if (levelId === 1) {
+  const template = NODE_TEMPLATES[levelId];
+  if (!template) {
     return {
       moduleId,
-      levelId: 1,
-      label: 'Level 1',
-      x: 220,
-      y: 380,
-      unlocks: [{ moduleId, levelId: 2 }],
-      prerequisiteDescription:
-        moduleId === 1
-          ? 'Unlocked by default'
-          : `Complete Module ${moduleId - 1} — Level 5 first`,
-    };
-  }
-  if (levelId === 2) {
-    return {
-      moduleId,
-      levelId: 2,
-      label: 'Level 2',
-      x: 500,
-      y: 240,
-      unlocks: [{ moduleId, levelId: 3 }],
-      prerequisiteDescription: 'Complete Level 1 first',
-    };
-  }
-  if (levelId === 3) {
-    return {
-      moduleId,
-      levelId: 3,
-      label: 'Level 3',
-      x: 500,
-      y: 520,
-      unlocks: [
-        { moduleId, levelId: 4 },
-        { moduleId, levelId: 6 },
-      ],
-      prerequisiteDescription: 'Complete Level 2 first',
-    };
-  }
-  if (levelId === 4) {
-    return {
-      moduleId,
-      levelId: 4,
-      label: 'Level 4',
-      x: 790,
-      y: 380,
-      unlocks: [{ moduleId, levelId: 5 }],
-      prerequisiteDescription: 'Complete Level 3 first',
-    };
-  }
-  if (levelId === 5) {
-    return {
-      moduleId,
-      levelId: 5,
-      label: 'Level 5 (Boss)',
-      x: 1060,
-      y: 380,
-      unlocks: moduleId < 3 ? [{ moduleId: moduleId + 1, levelId: 1 }] : [],
-      prerequisiteDescription: 'Complete Level 4 first',
+      levelId,
+      label: `Level ${levelId}`,
+      x: 0,
+      y: 0,
+      unlocks: [],
+      prerequisiteDescription: 'Complete preceding level first',
     };
   }
 
-  // Minigame branch nodes (nodes 6, 7, 8)
-  if (levelId === 6) {
+  // Find which levels within the same module are unlocked upon completing this node.
+  const unlocks: LevelTarget[] = template.sameModuleUnlocks.map((targetLevelId) => {
     return {
-      moduleId,
-      levelId: 6,
-      label: 'Minigame 1',
-      x: 320,
-      y: 560,
-      unlocks: [{ moduleId, levelId: 7 }],
-      prerequisiteDescription: 'Complete Level 3 first',
+      moduleId: moduleId,
+      levelId: targetLevelId,
     };
-  }
-  if (levelId === 7) {
-    return {
-      moduleId,
-      levelId: 7,
-      label: 'Minigame 2',
-      x: 640,
-      y: 570,
-      unlocks: [{ moduleId, levelId: 8 }],
-      prerequisiteDescription: 'Complete Minigame 1 first',
-    };
-  }
-  if (levelId === 8) {
-    return {
-      moduleId,
-      levelId: 8,
-      label: 'Minigame 3',
-      x: 960,
-      y: 600,
-      unlocks: [],
-      prerequisiteDescription: 'Complete Minigame 2 first',
-    };
+  });
+
+  // If completing this level unlocks the next module (e.g. boss levels in module 1 or 2),
+  // add Level 1 of the next module to the unlocked targets list.
+  if (template.unlocksNextModule && moduleId < 3) {
+    unlocks.push({ moduleId: moduleId + 1, levelId: 1 });
   }
 
   return {
     moduleId,
     levelId,
-    label: `Level ${levelId}`,
-    x: 0,
-    y: 0,
-    unlocks: [],
-    prerequisiteDescription: 'Complete preceding level first',
+    label: template.label,
+    x: template.x,
+    y: template.y,
+    unlocks,
+    prerequisiteDescription: template.prerequisiteDescription(moduleId),
   };
 }
 
@@ -212,8 +218,15 @@ export class MapProgressStore {
   public getUnlockedLevels(moduleId?: number): Array<{ moduleId: number; levelId: number }> {
     const result: Array<{ moduleId: number; levelId: number }> = [];
     for (const key of this.unlockedLevels) {
-      const [m, l] = key.split('-').map(Number);
-      if (m && l && (moduleId === undefined || m === moduleId)) {
+      // Keys are stored in the format "moduleId-levelId" (e.g. "1-3").
+      const parts = key.split('-');
+      const m = parseInt(parts[0], 10);
+      const l = parseInt(parts[1], 10);
+
+      const isValidNumbers = !Number.isNaN(m) && !Number.isNaN(l);
+      const matchesModuleFilter = moduleId === undefined || m === moduleId;
+
+      if (isValidNumbers && matchesModuleFilter) {
         result.push({ moduleId: m, levelId: l });
       }
     }
@@ -222,7 +235,10 @@ export class MapProgressStore {
 
   public getLockedLevels(moduleId?: number): Array<{ moduleId: number; levelId: number }> {
     const result: Array<{ moduleId: number; levelId: number }> = [];
-    const targetModules = moduleId !== undefined ? [moduleId] : [1, 2, 3];
+    let targetModules = [1, 2, 3];
+    if (moduleId !== undefined) {
+      targetModules = [moduleId];
+    }
 
     for (const m of targetModules) {
       for (let l = 1; l <= 5; l++) {
@@ -285,11 +301,6 @@ export class MapProgressStore {
     const node = getLevelNodeDefinition(moduleId, levelId);
     for (const target of node.unlocks) {
       this.unlockedLevels.add(this.toKey(target.moduleId, target.levelId));
-    }
-
-    // Minigame bridge: completing level 3 unlocks minigame 1 (node 6)
-    if (levelId === 3) {
-      this.unlockedLevels.add(this.toKey(moduleId, 6));
     }
 
     this.save();
