@@ -95,13 +95,19 @@ export class CombatScene extends Phaser.Scene {
     const host = createSceneOverlay(this);
     this.overlayHost = host;
 
-    // Dev victory button (allows testing level unlocks/progression immediately)
+    // Create the developer shortcut button element in the DOM
     const winTrigger = document.createElement('button');
+    // Set type="button" so pressing Enter to cast a spell never accidentally triggers this button
     winTrigger.type = 'button';
+    // Apply the CSS class that positions the button underneath the top-left HP bar
     winTrigger.className = 'game-victory-trigger';
+    // Set the visible label text on the button
     winTrigger.textContent = 'Complete Level (Dev)';
+    // Provide a tooltip explaining the button and its Shift+W keyboard shortcut
     winTrigger.title = 'Dev shortcut: simulate beating this level (or press Shift+W)';
+    // Trigger instant level victory when clicked
     winTrigger.onclick = () => this.triggerVictory();
+    // Mount the button inside the scene's DOM overlay container
     host.element.append(winTrigger);
 
     this.pauseMenu = createPauseMenu(host.element, {

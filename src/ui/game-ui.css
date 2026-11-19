@@ -11,11 +11,23 @@
 }
 .game-pause-trigger:focus-visible { outline: 2px solid #fff0be; outline-offset: 3px; }
 
+/* Dev button positioned directly underneath the top-left HP bar so it never blocks the answer input box */
 .game-victory-trigger {
-  position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 6;
-  padding: 12px 28px; border: 2px solid #b99c67; border-radius: 4px;
-  background: #23352c; color: #fff0be; font: bold 18px 'Trebuchet MS', sans-serif;
-  pointer-events: auto; cursor: pointer; transition: background 0.15s;
+  position: absolute; /* Position relative to the scaled game canvas overlay */
+  top: 118px; /* Place directly below the top-left portrait and HP bar (which ends at y = 110px) */
+  left: 24px; /* Align with the left edge of the HP portrait frame */
+  z-index: 6; /* Keep above the canvas layer but below modal overlays (z-index: 20) */
+  padding: 6px 14px; /* Compact padding so it stays clear of the wizard sprite below */
+  border: 2px solid #b99c67; /* Gold border matching the game HUD frame */
+  border-radius: 4px; /* Slightly rounded corners matching HUD plaques */
+  background: #23352c; /* Dark chalkboard green background */
+  color: #fff0be; /* Warm cream text color for high contrast */
+  font: bold 13px 'Trebuchet MS', sans-serif; /* Compact, legible label font */
+  pointer-events: auto; /* Enable mouse clicks inside the pass-through overlay host */
+  cursor: pointer; /* Show pointer hand on hover */
+  transition: background 0.15s; /* Smooth background highlight when hovered */
 }
+/* Lighten button background when the player hovers over it */
 .game-victory-trigger:hover { background: #32473c; }
+/* Show a high-contrast outline when focused via keyboard Tab navigation */
 .game-victory-trigger:focus-visible { outline: 2px solid #fff0be; outline-offset: 3px; }
