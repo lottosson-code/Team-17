@@ -6,7 +6,9 @@ import {
 } from './baseModal';
 
 export interface SettingsModalOptions {
+  // Optional callback called when the user closes the modal (Done, close '✕' button, Escape, etc.).
   onClose?: () => void;
+  // If the parent scene dies while this modal is open, this signal triggers cleanup.
   signal?: AbortSignal;
 }
 
@@ -22,7 +24,9 @@ export interface SliderRowConfig {
   id: string;
   label: string;
   initialValue: number;
+  // onInput fires continuously in real-time as you drag the slider (updates volume smoothly).
   onInput: (value: number) => void;
+  // onChange fires only once when you let go of the mouse (used to play a preview sound).
   onChange?: (value: number) => void;
 }
 
@@ -77,10 +81,13 @@ export function createSliderRow(
   input.step = '5';
   input.value = String(config.initialValue);
 
+  // Live text display next to the slider showing the number (e.g. "75%").
   const valueDisplay = doc.createElement('span');
   valueDisplay.className = 'cse-settings-val';
   valueDisplay.textContent = `${config.initialValue}%`;
 
+  // `oninput` runs constantly while sliding. We parse the string value to a number,
+  // update the percentage label immediately, and notify the callback.
   input.oninput = (): void => {
     const val = parseInt(input.value, 10);
     if (!Number.isNaN(val)) {
@@ -89,10 +96,18 @@ export function createSliderRow(
     }
   };
 
+  // `onchange` only fires when the user releases the slider thumb or finishes editing.
+  // We use this so sound preview effects don't trigger 60 times a second while dragging.
   if (config.onChange) {
     input.onchange = (): void => {
       const val = parseInt(input.value, 10);
-      config.onChange?.(Number.isNaN(val) ? 0 : val);
+      let safeVal = 0;
+      if (!Number.isNaN(val)) {
+        safeVal = val;
+      }
+      if (config.onChange) {
+        config.onChange(safeVal);
+      }
     };
   }
 
@@ -101,6 +116,7 @@ export function createSliderRow(
 
   return {
     element: row,
+    // Allows external code (like "Reset Defaults") to update the slider and text label.
     setValue(value: number): void {
       input.value = String(value);
       valueDisplay.textContent = `${value}%`;
@@ -127,6 +143,7 @@ export function createCheckboxRow(
   input.type = 'checkbox';
   input.checked = config.initialChecked;
 
+  // Whenever the user clicks the checkbox, notify the callback with true or false.
   input.onchange = (): void => {
     config.onChange(Boolean(input.checked));
   };
@@ -135,6 +152,7 @@ export function createCheckboxRow(
 
   return {
     element: row,
+    // Allows external code to programmatically check or uncheck the box.
     setChecked(checked: boolean): void {
       input.checked = checked;
     },
@@ -161,15 +179,21 @@ export function createSettingsModal(
   const doc = host.ownerDocument;
   const initialSettings = settingsStore.getSettings();
 
+  // Guard flag so closing only happens once, even if multiple close triggers happen
+  // at the exact same moment (like pressing Escape while clicking Done).
   let closed = false;
   const notifyClose = (): void => {
     if (closed) return;
     closed = true;
+    // Stop listening to store changes to prevent memory leaks when the modal is closed.
     unsubscribe();
     modal.destroy();
-    options.onClose?.();
+    if (options.onClose) {
+      options.onClose();
+    }
   };
 
+  // Mount the shared base modal foundation (handles ARIA, Escape, focus trapping, backdrop).
   const modal = createBaseModal(host, {
     ariaLabel: 'Game Settings',
     title: 'Settings',
@@ -219,6 +243,8 @@ export function createSettingsModal(
   // ---------------------------------------------------------------------------
   // Store Subscription: Live Synchronisation
   // ---------------------------------------------------------------------------
+  // If settings change from somewhere else while this modal is open (or when reset),
+  // this subscriber automatically updates the slider handles and checkbox to match.
   const unsubscribe = settingsStore.subscribe((s) => {
     musicRow.setValue(s.musicVolume);
     sfxRow.setValue(s.sfxVolume);
@@ -232,6 +258,7 @@ export function createSettingsModal(
     label: 'Reset Defaults',
     variant: 'secondary',
     onClick: () => {
+      // Revert volumes back to 80% and mute to false in the underlying store.
       settingsStore.resetToDefaults();
       soundManager.playSfx('click');
       const reset = settingsStore.getSettings();
@@ -251,8 +278,10 @@ export function createSettingsModal(
 
   modal.footer.append(resetBtn, doneBtn);
 
-  // Defensive: set initial focus on Done
-  if (!options.signal?.aborted) {
+  // Set initial keyboard focus on the 'Done' button so the user can easily press Enter to close.
+  // We check aborted first so we don't try to focus a button if the scene was already destroyed.
+  const hasAborted = options.signal ? options.signal.aborted : false;
+  if (!hasAborted) {
     doneBtn.focus();
   }
 

@@ -1,3 +1,16 @@
+/**
+ * Global Settings State Store.
+ *
+ * Manages player settings across the game, including music volume, sound effects volume,
+ * audio muting, and game difficulty. Implements an observable pattern via `subscribe()`,
+ * allowing UI controls and audio managers to reactively update without polling.
+ *
+ * Persistence Strategy:
+ * - Persists settings to browser `localStorage` under `SETTINGS_STORAGE_KEY`.
+ * - Employs a defensive in-memory fallback (`memoryFallback`) if `localStorage` is unavailable,
+ *   restricted by browser sandbox permissions, or throws QuotaExceededError.
+ */
+
 export type GameDifficulty = 'Easy' | 'Normal' | 'Hard';
 
 export interface GameSettings {
@@ -15,6 +28,8 @@ export const DEFAULT_SETTINGS: Readonly<GameSettings> = {
 };
 
 export const SETTINGS_STORAGE_KEY = 'team17_math_rpg_settings_v1';
+
+export const VALID_DIFFICULTIES: readonly GameDifficulty[] = ['Easy', 'Normal', 'Hard'];
 
 export class SettingsStore {
   private static instance: SettingsStore | null = null;
@@ -41,46 +56,43 @@ export class SettingsStore {
     return { ...this.settings };
   }
 
-  public setMusicVolume(val: number): GameSettings {
-    this.settings.musicVolume = this.clampVolume(val);
+  /**
+   * Persists current settings, notifies subscribers, and returns a fresh snapshot.
+   */
+  private commit(): GameSettings {
     this.saveSettings();
     this.notify();
     return this.getSettings();
+  }
+
+  public setMusicVolume(val: number): GameSettings {
+    this.settings.musicVolume = this.clampVolume(val);
+    return this.commit();
   }
 
   public setSfxVolume(val: number): GameSettings {
     this.settings.sfxVolume = this.clampVolume(val);
-    this.saveSettings();
-    this.notify();
-    return this.getSettings();
+    return this.commit();
   }
 
   public toggleMute(): GameSettings {
     this.settings.muted = !this.settings.muted;
-    this.saveSettings();
-    this.notify();
-    return this.getSettings();
+    return this.commit();
   }
 
   public setMuted(muted: boolean): GameSettings {
     this.settings.muted = Boolean(muted);
-    this.saveSettings();
-    this.notify();
-    return this.getSettings();
+    return this.commit();
   }
 
   public setDifficulty(difficulty: GameDifficulty): GameSettings {
     this.settings.difficulty = difficulty;
-    this.saveSettings();
-    this.notify();
-    return this.getSettings();
+    return this.commit();
   }
 
   public resetSettings(): GameSettings {
     this.settings = { ...DEFAULT_SETTINGS };
-    this.saveSettings();
-    this.notify();
-    return this.getSettings();
+    return this.commit();
   }
 
   public resetToDefaults(): GameSettings {
@@ -110,9 +122,22 @@ export class SettingsStore {
     };
   }
 
+  /**
+   * Ensures a volume value is an integer between 0 and 100 inclusive.
+   */
   private clampVolume(val: number): number {
-    if (Number.isNaN(val)) return 0;
-    return Math.max(0, Math.min(100, Math.round(val)));
+    if (Number.isNaN(val)) {
+      return 0;
+    }
+    // Round to nearest whole integer, then bound strictly between 0 and 100.
+    const rounded = Math.round(val);
+    if (rounded < 0) {
+      return 0;
+    }
+    if (rounded > 100) {
+      return 100;
+    }
+    return rounded;
   }
 
   private notify(): void {
@@ -121,7 +146,7 @@ export class SettingsStore {
       try {
         listener(current);
       } catch {
-        // Prevent subscriber errors from bubbling
+        // Defensive: Prevent subscriber errors from bubbling
       }
     }
   }
@@ -152,12 +177,33 @@ export class SettingsStore {
 
       if (rawData) {
         const parsed = JSON.parse(rawData);
-        const validDifficulties: GameDifficulty[] = ['Easy', 'Normal', 'Hard'];
+
+        // Validate each setting individually so corrupted, missing, or out-of-date keys fallback safely.
+        let musicVolume = DEFAULT_SETTINGS.musicVolume;
+        if (typeof parsed.musicVolume === 'number') {
+          musicVolume = this.clampVolume(parsed.musicVolume);
+        }
+
+        let sfxVolume = DEFAULT_SETTINGS.sfxVolume;
+        if (typeof parsed.sfxVolume === 'number') {
+          sfxVolume = this.clampVolume(parsed.sfxVolume);
+        }
+
+        let muted = DEFAULT_SETTINGS.muted;
+        if (typeof parsed.muted === 'boolean') {
+          muted = parsed.muted;
+        }
+
+        let difficulty = DEFAULT_SETTINGS.difficulty;
+        if (VALID_DIFFICULTIES.includes(parsed.difficulty)) {
+          difficulty = parsed.difficulty;
+        }
+
         return {
-          musicVolume: typeof parsed.musicVolume === 'number' ? this.clampVolume(parsed.musicVolume) : DEFAULT_SETTINGS.musicVolume,
-          sfxVolume: typeof parsed.sfxVolume === 'number' ? this.clampVolume(parsed.sfxVolume) : DEFAULT_SETTINGS.sfxVolume,
-          muted: typeof parsed.muted === 'boolean' ? parsed.muted : DEFAULT_SETTINGS.muted,
-          difficulty: validDifficulties.includes(parsed.difficulty) ? parsed.difficulty : DEFAULT_SETTINGS.difficulty,
+          musicVolume,
+          sfxVolume,
+          muted,
+          difficulty,
         };
       }
     } catch {
@@ -167,8 +213,8 @@ export class SettingsStore {
   }
 
   private saveSettings(): void {
+    const json = JSON.stringify(this.settings);
     try {
-      const json = JSON.stringify(this.settings);
       const storage = this.getStorage();
       if (storage) {
         storage.setItem(SETTINGS_STORAGE_KEY, json);
@@ -176,7 +222,7 @@ export class SettingsStore {
         this.memoryFallback = json;
       }
     } catch {
-      this.memoryFallback = JSON.stringify(this.settings);
+      this.memoryFallback = json;
     }
   }
 }
