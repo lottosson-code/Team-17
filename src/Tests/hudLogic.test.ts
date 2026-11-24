@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { makeProblem } from '../combat/problems';
-import type { Enemy, EnemyKind } from '../combat/types';
-import { DANGER_START, heartFills, laneDanger, lowHealthLevel } from '../combat/view/hudLogic';
+import type { Enemy, EnemyKind, PowerUpKind } from '../combat/types';
+import { DANGER_START, heartFills, laneDanger, lowHealthLevel, POWER_UP_TEXTURE } from '../combat/view/hudLogic';
 
 const KIND: EnemyKind = { id: 'grunt', maxHp: 10, walkMs: 1000, attackDamage: 1, attackIntervalMs: 500 };
 
@@ -56,5 +56,13 @@ describe('lowHealthLevel', () => {
         expect(lowHealthLevel(40, 100)).toBe(0);
         expect(lowHealthLevel(20, 100)).toBeCloseTo(0.5);
         expect(lowHealthLevel(0, 100)).toBe(1);
+    });
+});
+
+describe('POWER_UP_TEXTURE', () => {
+    test('gives every power-up kind its own texture', () => {
+        const kinds: PowerUpKind[] = ['freeze', 'heal', 'zap'];
+        const keys = kinds.map(kind => POWER_UP_TEXTURE[kind]);
+        expect(new Set(keys).size).toBe(kinds.length);
     });
 });

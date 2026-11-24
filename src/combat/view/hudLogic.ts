@@ -1,9 +1,16 @@
-import { LANE_COUNT, type Enemy } from '../types';
+import { LANE_COUNT, type Enemy, type PowerUpKind } from '../types';
 
 // Pure helpers behind the HUD and battlefield, kept free of Phaser so they can be unit-tested.
 
 /** Progress at which a lane starts glowing red. */
 export const DANGER_START = 0.55;
+
+/** Texture key for each power-up's icon (drawn in textures.ts). */
+export const POWER_UP_TEXTURE: Record<PowerUpKind, string> = {
+    freeze: 'pu-freeze',
+    heal: 'pu-heal',
+    zap: 'pu-zap',
+};
 
 /** Danger per lane from 0 (safe) to 1 (an enemy is at the wizard), based on the closest enemy in it. */
 export function laneDanger(enemies: readonly Readonly<Enemy>[]): number[] {
