@@ -155,7 +155,6 @@ export class CombatModel {
                 events.push({ type: 'powerUpUsed', kind });
                 break;
             case 'heal':
-                if (this.playerHp >= this.level.playerMaxHp) return [];
                 this.playerHp = Math.min(this.level.playerMaxHp, this.playerHp + powers.healAmount);
                 events.push({ type: 'powerUpUsed', kind });
                 break;
