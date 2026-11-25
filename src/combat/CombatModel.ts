@@ -171,6 +171,13 @@ export class CombatModel {
                     this.defeatedCount++;
                     events.push({ type: 'enemyDefeated', enemyId: target.id });
                     this.checkWon(events);
+                } else {
+                    const hitsBefore = Math.ceil((target.hp + ZAP_DAMAGE) / this.level.damagePerHit);
+                    const hitsAfter = Math.ceil(target.hp / this.level.damagePerHit);
+                    for (let i = 0; i < (hitsBefore - hitsAfter); i++) {
+                        target.problem = this.createProblem(target.problems);
+                    }
+                    events.push({ type: 'newProblem', enemyId: target.id });
                 }
                 break;
             }
