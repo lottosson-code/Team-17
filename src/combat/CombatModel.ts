@@ -19,6 +19,7 @@ export const SPAWN_CLEARANCE = 0.12;
 
 /** Default spawn order of power ups */
 export const DEFAULT_POWER_UP_REWARDS: PowerUpKind[] = ['freeze', 'heal', 'zap'];
+export const ZAP_DAMAGE = 30;
 
 /**
  * The rules of one combat level, with no Phaser or DOM code.
@@ -159,15 +160,18 @@ export class CombatModel {
                 events.push({ type: 'powerUpUsed', kind });
                 break;
             case 'zap': {
-                // Defeats the enemy closest to the wizard, whatever its problem.
+                // Deals ZAP_DAMAGE (30) to the frontmost enemy.
                 const target = this.frontMostEnemy();
                 if (!target) return [];
-                events.push({ type: 'powerUpUsed', kind, enemyId: target.id });
-                this.split(target, events);
-                this.enemies = this.enemies.filter(enemy => enemy !== target);
-                this.defeatedCount++;
-                events.push({ type: 'enemyDefeated', enemyId: target.id });
-                this.checkWon(events);
+                target.hp = Math.max(0, target.hp - ZAP_DAMAGE);
+                events.push({ type: 'hit', enemyId: target.id, damage: ZAP_DAMAGE });
+                if (target.hp == 0) {
+                    this.split(target, events);
+                    this.enemies = this.enemies.filter(enemy => enemy !== target);
+                    this.defeatedCount++;
+                    events.push({ type: 'enemyDefeated', enemyId: target.id });
+                    this.checkWon(events);
+                }
                 break;
             }
         }

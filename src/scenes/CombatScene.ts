@@ -364,12 +364,8 @@ export class CombatScene extends Phaser.Scene {
       // The model sends 'enemyDefeated' right after this, which plays the death animation.
       const sprite = enemyId === undefined ? undefined : this.enemySprites.get(enemyId);
       if (!sprite) return;
-      const target = sprite.centre();
-      this.wizard.cast(target);
-      this.effects.bolt(this.wizard.tip(), target);
-      this.effects.impact(target);
       this.effects.shake(0.005, 140);
-      this.effects.callout(target, 'ZAP!', '#ffe27a');
+      this.effects.callout(sprite.centre(), 'ZAP!', '#ffe27a');
     }
   }
 
