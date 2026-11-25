@@ -163,6 +163,7 @@ export class CombatModel {
                 const target = this.frontMostEnemy();
                 if (!target) return [];
                 events.push({ type: 'powerUpUsed', kind, enemyId: target.id });
+                this.split(target, events);
                 this.enemies = this.enemies.filter(enemy => enemy !== target);
                 this.defeatedCount++;
                 events.push({ type: 'enemyDefeated', enemyId: target.id });
