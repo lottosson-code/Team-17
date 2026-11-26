@@ -193,7 +193,10 @@ export class Battlefield {
         const g = this.scene.add.graphics().setDepth(DEPTH.room + 1);
         for (const w of windows) {
             g.fillStyle(0x140d1c).fillRect(w.x - 9, w.y - 9, w.w + 18, w.h + 18);
-            g.fillGradientStyle(0x2a2a78, 0x2a2a78, 0x8a62d0, 0x8a62d0, 1).fillRect(w.x, w.y, w.w, w.h);
+            // [Changed] Sky colours come from the theme when it sets them (per-classroom variants).
+            const skyTop = colors.skyTop ?? 0x2a2a78;
+            const skyBottom = colors.skyBottom ?? 0x8a62d0;
+            g.fillGradientStyle(skyTop, skyTop, skyBottom, skyBottom, 1).fillRect(w.x, w.y, w.w, w.h);
         }
 
         this.moonGlow = this.scene.add.image(moon.x, moon.y, TEX.glow)

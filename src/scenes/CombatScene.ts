@@ -10,11 +10,17 @@ import { laneDanger, lowHealthLevel } from '../combat/view/hudLogic';
 import { createTextures } from '../combat/view/textures';
 import { CURSED_CLASSROOM, DEPTH, enemyArt, themeTextures, wizardFeet } from '../combat/view/theme';
 import { WizardSprite } from '../combat/view/WizardSprite';
+// [Added] Per-classroom / per-level colours, moon and chalkboard for the battlefield.
+import { classroomTheme } from '../combat/view/classroomThemes';
 import { mapProgressStore } from '../state/mapProgressStore';
 import { createPauseMenu, type PauseMenuController } from '../../pause menu/index.js';
 import { createSceneOverlay } from '../ui/sceneOverlay';
 import { createSettingsModal, type SettingsModalController } from '../ui/settingsModal';
 import { soundManager } from '../audio/soundManager';
+// [Added] "COMPLETED" banner after the final level.
+import { playCompletedBanner, preloadCompletedBanner } from '../ui/completedBanner';
+// [Added] Shared fade-to-black transition for leaving / restarting the level.
+import { restartSceneWithTransition, startSceneWithTransition } from '../ui/sceneTransition';
 import '../ui/modal.css';
 import '../ui/game-ui.css';
 
@@ -24,6 +30,9 @@ const MAX_INPUT_LENGTH = 4;
 /** Cap per-frame time so switching tabs doesn't teleport enemies. */
 const MAX_FRAME_MS = 100;
 const THEME = CURSED_CLASSROOM;
+/** [Added] The boss level that ends each classroom, and how many classrooms there are. */
+const LAST_LEVEL_IN_CLASSROOM = 5;
+const CLASSROOM_COUNT = 3;
 
 export class CombatScene extends Phaser.Scene {
   private moduleId = 1;
@@ -41,6 +50,8 @@ export class CombatScene extends Phaser.Scene {
   private paused = false;
   /** Resolves the running cutscene's wait for its enemies to finish walking in. */
   private walkInReady: (() => void) | undefined;
+  /** [Added] True while the victory panel offers Next Classroom, so the N key works. */
+  private canGoToNextClassroom = false;
   /** Animation clock that stops while paused. */
   private animTime = 0;
 
@@ -60,11 +71,14 @@ export class CombatScene extends Phaser.Scene {
     this.wavesStarted = 0;
     this.paused = false;
     this.walkInReady = undefined;
+    this.canGoToNextClassroom = false;
   }
 
   preload(): void {
     this.load.font('Lora', 'assets/fonts/Lora-Variable.woff', 'woff');
     this.load.font('Poppins', 'assets/fonts/Poppins-Bold.woff', 'woff');
+    // [Added] Art for the "COMPLETED" banner.
+    preloadCompletedBanner(this);
     for (const art of themeTextures(THEME)) {
       if (!this.textures.exists(art.texture)) this.load.image(art.texture, `assets/combat/enemies/${art.file}.webp`);
       const walk = art.walk;
@@ -82,7 +96,9 @@ export class CombatScene extends Phaser.Scene {
     createWalkAnimations(this, themeTextures(THEME));
     this.model = new CombatModel(getLevel(this.moduleId, this.levelId));
 
-    this.battlefield = new Battlefield(this, THEME);
+    // [Changed] Was new Battlefield(this, THEME): each classroom and level now looks slightly different.
+    // Enemy art, the boss and the desk still come from THEME (they're the same in every variant).
+    this.battlefield = new Battlefield(this, classroomTheme(this.moduleId, this.levelId));
     this.wizard = new WizardSprite(this, wizardFeet(THEME));
     this.effects = new Effects(this);
     this.hud = new Hud(this, THEME.name, {
@@ -90,6 +106,8 @@ export class CombatScene extends Phaser.Scene {
       onPause: () => this.togglePause(),
       onRestart: () => this.restart(),
       onMenu: () => this.toMenu(),
+      // [Added] Button on the level 5 victory panel.
+      onNextClassroom: () => this.toNextClassroom(),
     });
 
     const host = createSceneOverlay(this);
@@ -146,7 +164,8 @@ export class CombatScene extends Phaser.Scene {
     });
 
     this.input.keyboard!.on('keydown', (event: KeyboardEvent) => this.onKey(event));
-    this.cameras.main.fadeIn(400, 5, 2, 12);
+    // [Changed] Removed cameras.main.fadeIn(400, 5, 2, 12): the shared fade-to-black transition
+    // (src/ui/fadeTransition.ts) now reveals the level, the same way as every other screen.
 
     this.events.once('shutdown', () => {
       this.settingsModal?.destroy();
@@ -193,6 +212,8 @@ export class CombatScene extends Phaser.Scene {
     if (status === 'won' || status === 'lost' || this.paused) {
       if (event.key === 'r' || event.key === 'R') this.restart();
       if (event.key === 'm' || event.key === 'M') this.toMenu();
+      // [Added] N = Next Classroom, only when the victory panel shows that button.
+      if ((event.key === 'n' || event.key === 'N') && this.canGoToNextClassroom) this.toNextClassroom();
       return;
     }
     // No typing while a cutscene plays.
@@ -255,17 +276,47 @@ export class CombatScene extends Phaser.Scene {
     }
     soundManager.playSfx('start');
     mapProgressStore.completeLevel(this.moduleId, this.levelId);
-    this.hud.showOverlay('won');
+    // [Changed] Was hud.showOverlay('won'); showVictory adds Next Classroom / COMPLETED.
+    this.showVictory();
+  }
+
+  /**
+   * [Added] Shows the victory panel. Level 5 of classrooms 1-2 gets a Next Classroom button;
+   * level 5 of the last classroom first plays the "COMPLETED" banner, then shows the panel.
+   */
+  private showVictory(): void {
+    const finishedClassroom = this.levelId === LAST_LEVEL_IN_CLASSROOM;
+    const hasNextClassroom = finishedClassroom && this.moduleId < CLASSROOM_COUNT;
+    this.canGoToNextClassroom = hasNextClassroom;
+    if (finishedClassroom && !hasNextClassroom) {
+      void playCompletedBanner(this).then(() => {
+        // Skip if the player already left (restart / map) while the banner played.
+        if (this.sys.isActive()) this.hud.showOverlay('won');
+      });
+      return;
+    }
+    this.hud.showOverlay('won', { nextClassroom: hasNextClassroom });
+  }
+
+  /** [Added] Opens the map on the next classroom's islands (completing level 5 already unlocked its level 1). */
+  private toNextClassroom(): void {
+    if (this.moduleId >= CLASSROOM_COUNT) return;
+    this.time.paused = false;
+    soundManager.playSfx('click');
+    // roomIndex is 0-based, so the next classroom's index equals this moduleId.
+    void startSceneWithTransition(this, 'MainMenu', { showMap: true, roomIndex: this.moduleId });
   }
 
   private restart(): void {
     this.time.paused = false;
-    this.scene.restart({ moduleId: this.moduleId, levelId: this.levelId });
+    // [Changed] Was this.scene.restart(...); now behind the shared fade-to-black transition.
+    void restartSceneWithTransition(this, { moduleId: this.moduleId, levelId: this.levelId });
   }
 
   private toMenu(): void {
     this.time.paused = false;
-    this.scene.start('MainMenu', { showMap: true, roomIndex: this.moduleId - 1 });
+    // [Changed] Was this.scene.start(...); now behind the shared fade-to-black transition.
+    void startSceneWithTransition(this, 'MainMenu', { showMap: true, roomIndex: this.moduleId - 1 });
   }
 
   // ---------------------------------------------------------------- events
@@ -310,7 +361,8 @@ export class CombatScene extends Phaser.Scene {
           break;
         case 'won':
           mapProgressStore.completeLevel(this.moduleId, this.levelId);
-          this.hud.showOverlay('won');
+          // [Changed] Was hud.showOverlay('won'); showVictory adds Next Classroom / COMPLETED.
+          this.showVictory();
           break;
         case 'lost':
           this.wizard.defeat();

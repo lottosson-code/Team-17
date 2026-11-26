@@ -63,8 +63,8 @@
 .cse-map button:focus-visible { outline: none; }
 .cse-map__room:focus-visible .cse-map__label, .cse-map__island:focus-visible .cse-map__label { text-decoration: underline; text-underline-offset: .35cqw; text-shadow: 0 0 .6cqw #f6d992; }
 .cse-map .cse-map__back:focus-visible { background: #ac854ee8; text-decoration: underline; }
-.cse-map[data-room='olive'] .cse-map__background { filter: hue-rotate(12deg); }
-.cse-map[data-room='blue'] .cse-map__background { filter: hue-rotate(-9deg) saturate(.85); }
+/* [Changed] Removed the olive/blue hue-rotate filters: classrooms 2 and 3 now have their own
+   recoloured background and island art (ASSETS.dreamByRoom / islandsByRoom in assets/index.ts). */
 .cse-map__sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .cse-map * { transition: none !important; } }
 

@@ -9,6 +9,9 @@ import { mapProgressStore } from '../state/mapProgressStore';
 // Remembers the last level played, for the Continue button.
 import { clearLastPlayed, loadLastPlayed, saveLastPlayed } from '../ui/lastPlayed';
 import type { LevelSelection } from '../../map/types.js';
+// [Added] Shared fade-to-black transition for menu -> map and map -> level.
+import { isFadeTransitionRunning, fadeTransition } from '../ui/fadeTransition';
+import { startSceneWithTransition } from '../ui/sceneTransition';
 import '../ui/modal.css';
 
 export interface MainMenuSceneData {
@@ -75,7 +78,8 @@ export class MainMenuScene extends Phaser.Scene {
             menu?.update({ hidden: { continue: true } });
             // Redraw after the reset (`?.`: tests call this without a menu).
             menu?.update({ progress: currentProgress() });
-            ui.showMap();
+            // [Changed] Was ui.showMap(); now behind the shared fade-to-black transition.
+            void fadeTransition(() => ui.showMap());
           },
           continue: () => {
             // Continue: reopen the level the player started most recently, from its beginning.
@@ -87,7 +91,8 @@ export class MainMenuScene extends Phaser.Scene {
             }
             // No saved level (the button is normally hidden then): just open the map.
             soundManager.playSfx('click');
-            ui.showMap();
+            // [Changed] Was ui.showMap(); now behind the shared fade-to-black transition.
+            void fadeTransition(() => ui.showMap());
           },
           settings: ({ signal }) => {
             soundManager.playSfx('modalOpen');
@@ -180,6 +185,8 @@ export class MainMenuScene extends Phaser.Scene {
    * Used by both the map (clicking a level) and the Continue button.
    */
   private startLevel(selection: LevelSelection): void {
+    // [Added] Ignore extra clicks while the fade to a level is already playing.
+    if (isFadeTransitionRunning()) return;
     // Save first, so the level is already stored however the player later leaves
     // (pause menu, closing the browser, ...), and Continue can reopen it.
     saveLastPlayed(selection);
@@ -188,14 +195,15 @@ export class MainMenuScene extends Phaser.Scene {
     const gameplay = toGameplaySelection(selection);
     if (gameplay.activity === 'minigame') {
       if (gameplay.levelId === 1) {
-        this.scene.start('Make24', { moduleId: gameplay.moduleId, levelId: 6 });
+        // [Changed] scene.start -> startSceneWithTransition (shared fade-to-black transition), here and below.
+        void startSceneWithTransition(this, 'Make24', { moduleId: gameplay.moduleId, levelId: 6 });
         return;
       }
       if (gameplay.levelId === 2) {
-        this.scene.start('Blacksmith', { moduleId: gameplay.moduleId, levelId: 7 });
+        void startSceneWithTransition(this, 'Blacksmith', { moduleId: gameplay.moduleId, levelId: 7 });
         return;
       }
     }
-    this.scene.start('Combat', gameplay);
+    void startSceneWithTransition(this, 'Combat', gameplay);
   }
 }

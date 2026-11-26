@@ -3,6 +3,8 @@ import { mountMake24, type Make24Controller } from '../minigames/make24/src/make
 import { createSceneOverlay } from '../ui/sceneOverlay';
 import { mapProgressStore } from '../state/mapProgressStore';
 import { soundManager } from '../audio/soundManager';
+// [Added] Shared fade-to-black transition back to the map.
+import { startSceneWithTransition } from '../ui/sceneTransition';
 
 export interface Make24SceneData {
   moduleId?: number;
@@ -34,7 +36,8 @@ export class Make24Scene extends Phaser.Scene {
       },
       onExit: () => {
         soundManager.playSfx('click');
-        this.scene.start('MainMenu', { showMap: true, roomIndex: this.moduleId - 1 });
+        // [Changed] Was this.scene.start(...); now behind the shared fade-to-black transition.
+        void startSceneWithTransition(this, 'MainMenu', { showMap: true, roomIndex: this.moduleId - 1 });
       },
     });
 

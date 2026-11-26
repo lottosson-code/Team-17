@@ -2,6 +2,8 @@ import type { MapController, MapOptions, MapState } from './types.js';
 import { classrooms, islands, islandSprites, MAP_CONNECTIONS } from './layout.js';
 import { MAP_TEXT } from './labels.js';
 import { ASSETS } from '../assets/index.js';
+// [Added] Shared fade-to-black transition between the classroom list and a classroom's islands.
+import { fadeTransition } from '../src/ui/fadeTransition.js';
 
 function createButton(className: string): HTMLButtonElement {
   const button = document.createElement('button');
@@ -82,7 +84,8 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
         button.setAttribute('aria-disabled', 'true');
         button.title = `Module ${index + 1} Locked — Complete Module ${index} first`;
       } else {
-        button.onclick = () => showIslands(index);
+        // [Changed] Was showIslands(index) directly; now behind the fade-to-black transition.
+        button.onclick = () => { void fadeTransition(() => showIslands(index)); };
       }
       content.append(button);
       if (room.id === previousRoom) button.focus({ preventScroll: true });
@@ -145,7 +148,9 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
     title.textContent = MAP_TEXT.submapTitles[roomIndex] || MAP_TEXT.classroomTitle;
     state = { ...state, roomId: room.id };
     root.dataset.room = room.tint;
-    background.src = ASSETS.dream;
+    // [Changed] Each classroom has its own background and island art (was ASSETS.dream for all).
+    background.src = ASSETS.dreamByRoom[roomIndex] ?? ASSETS.dream;
+    const islandArt = ASSETS.islandsByRoom[roomIndex] ?? ASSETS.islands;
     appendBridges();
 
     islands.forEach((island, index) => {
@@ -169,6 +174,8 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
       const sprite = document.createElement('span');
       sprite.className = 'cse-map__sprite';
       sprite.style.backgroundPositionX = island.spriteIndex * 25 + '%';
+      // [Added] This classroom's version of the island sheet (overrides the CSS default).
+      sprite.style.backgroundImage = `url("${islandArt}")`;
       sprite.setAttribute('aria-hidden', 'true');
       const area = document.createElement('span');
       area.className = 'cse-map__island-area';
@@ -224,13 +231,15 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
 
   back.onclick = () => {
     if (destroyed) return;
-    if (state.view === 'islands') showRooms();
+    // [Changed] Islands -> classrooms fades through black (the menu side does its own in game-ui.ts).
+    if (state.view === 'islands') void fadeTransition(showRooms);
     else options.onBackToMenu?.();
   };
   root.onkeydown = event => {
     if (event.key === 'Escape' && state.view === 'islands') {
       event.preventDefault();
-      showRooms();
+      // [Changed] Same fade as the Back button.
+      void fadeTransition(showRooms);
     }
   };
   host.append(root);

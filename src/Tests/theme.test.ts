@@ -66,7 +66,8 @@ describe('CURSED_CLASSROOM theme', () => {
         }
         // Slower walkers animate more slowly; art without a walk cycle is unaffected.
         expect(walkTimeScale(art, 3, walkMs * 2)).toBeCloseTo(walkTimeScale(art, 3, walkMs) / 2, 9);
-        expect(walkTimeScale(CURSED_CLASSROOM.enemies.pencil, 3, walkMs)).toBe(1);
+        // [Changed] Was enemies.pencil, which now has a walk cycle; the boss still has none.
+        expect(walkTimeScale(CURSED_CLASSROOM.boss, 3, walkMs)).toBe(1);
     });
 
     test('themeTextures lists each texture once, including the boss', () => {

@@ -12,6 +12,14 @@ export interface HudCallbacks {
     onPause(): void;
     onRestart(): void;
     onMenu(): void;
+    /** [Added] Called by the Next Classroom button on the level 5 victory panel (classrooms 1-2). */
+    onNextClassroom?(): void;
+}
+
+/** [Added] Extra choices for the end-of-level panel. */
+export interface OverlayOptions {
+    /** Show a Next Classroom button (only used with 'won'). */
+    nextClassroom?: boolean;
 }
 
 export interface HudState {
@@ -238,29 +246,37 @@ export class Hud {
         this.scene.tweens.add({ targets: this.banner, alpha: 0, delay: holdMs, duration: 400 });
     }
 
-    /** Pause menu or end-of-level panel, with buttons. Pass undefined to close it. */
-    showOverlay(kind: 'paused' | 'won' | 'lost' | undefined): void {
+    /** Pause menu or end-of-level panel, with buttons. Pass undefined to close it.
+     *  [Added] options.nextClassroom adds a Next Classroom button to the victory panel. */
+    showOverlay(kind: 'paused' | 'won' | 'lost' | undefined, options: OverlayOptions = {}): void {
         this.overlay?.destroy();
         this.overlay = undefined;
         if (!kind) return;
 
         const add = this.scene.add;
         const dim = add.rectangle(640, 360, 1280, 720, 0x05020c, 0.6).setInteractive();
+        // [Added] Next Classroom only makes sense on a win with a classroom after this one.
+        const showNext = kind === 'won' && options.nextClassroom === true && this.callbacks.onNextClassroom !== undefined;
         const box = add.graphics();
-        bannerShape(box, 640, 210, 560, 300);
+        // [Changed] The panel is wider when it holds three buttons.
+        bannerShape(box, 640, 210, showNext ? 680 : 560, 300);
         const titles = { paused: 'PAUSED', won: 'VICTORY!', lost: 'DEFEATED' };
         const colors = { paused: '#f3e6c4', won: '#ffd76a', lost: '#ff6b7a' };
         const title = add.text(640, 290, titles[kind], {
             fontFamily: 'Lora', fontSize: '54px', fontStyle: 'bold', color: colors[kind], stroke: '#140818', strokeThickness: 8,
         }).setOrigin(0.5);
-        const buttons = kind === 'paused'
-            ? [['Resume', () => this.callbacks.onPause()], ['Restart', () => this.callbacks.onRestart()], ['Back to Map', () => this.callbacks.onMenu()]] as const
-            : [['Play Again', () => this.callbacks.onRestart()], ['Back to Map', () => this.callbacks.onMenu()]] as const;
-        const spacing = 190;
+        const buttons: (readonly [string, () => void])[] = kind === 'paused'
+            ? [['Resume', () => this.callbacks.onPause()], ['Restart', () => this.callbacks.onRestart()], ['Back to Map', () => this.callbacks.onMenu()]]
+            : [['Play Again', () => this.callbacks.onRestart()], ['Back to Map', () => this.callbacks.onMenu()]];
+        // [Added] Third button on the level 5 victory panel: go on to the next classroom.
+        if (showNext) buttons.push(['Next Classroom', () => this.callbacks.onNextClassroom?.()]);
+        const spacing = showNext ? 205 : 190;
         const first = 640 - ((buttons.length - 1) * spacing) / 2;
         const items: Phaser.GameObjects.GameObject[] = [dim, box, title];
         buttons.forEach(([label, action], i) => items.push(menuButton(this.scene, first + i * spacing, 410, label, action)));
-        const hint = kind === 'paused' ? 'Esc to resume' : 'R to restart  ·  M for map';
+        // [Changed] Mentions the N shortcut when the Next Classroom button is shown.
+        const hint = kind === 'paused' ? 'Esc to resume'
+            : showNext ? 'R to restart  ·  M for map  ·  N for next classroom' : 'R to restart  ·  M for map';
         items.push(add.text(640, 470, hint, { fontFamily: 'Lora', fontSize: '16px', color: '#a99ccc' }).setOrigin(0.5));
 
         this.overlay = add.container(0, 0, items).setDepth(DEPTH.overlay).setAlpha(1);

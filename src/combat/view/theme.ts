@@ -59,6 +59,8 @@ export interface BattlefieldTheme {
         danger: number;
         moonlight: number;
         candle: number;
+        skyTop?: number; // [Added] Night sky in the windows (top/bottom); optional, defaults to the original purple
+        skyBottom?: number;
     };
     wallBottom: number; // y where the back wall meets the floor
     floorBottom: number; // y where the floor disappears behind the HUD
@@ -105,7 +107,16 @@ export const CURSED_CLASSROOM: BattlefieldTheme = {
     ],
     desk: { left: 14, right: 288, bottom: 548, height: 122, depth: 0.15, wizard: { u: 0.5, v: 0.42 } },
     enemies: {
-        pencil: { texture: 'enemy-pencil', file: 'pencil', name: 'Pencil', height: 132 },
+        // [Changed] Pencil, sharpener and erasers now have 4-frame walk cycles (scripts/make-walk-frames.py,
+        // then scripts/make-spritesheet.py). Their heights grew a little because the frames include the
+        // new legs; the bodies are drawn at the same size as before. Old heights in the comments.
+        pencil: {
+            texture: 'enemy-pencil', file: 'pencil', name: 'Pencil', height: 150, // was 132
+            walk: {
+                texture: 'enemy-pencil-walk', file: 'pencil-walk',
+                frames: 4, frameWidth: 190, frameHeight: 300, fps: 6, stride: 38, faceLeft: true,
+            },
+        },
         textbook: {
             texture: 'enemy-red-book', file: 'red-book', name: 'Textbook', height: 128,
             walk: {
@@ -113,13 +124,49 @@ export const CURSED_CLASSROOM: BattlefieldTheme = {
                 frames: 12, frameWidth: 266, frameHeight: 300, fps: 12, stride: 80, faceLeft: true,
             },
         },
-        miniBoss: { texture: 'enemy-sharpener', file: 'pencil-sharpener', name: 'Sharpener Brute', height: 220 },
+        miniBoss: {
+            texture: 'enemy-sharpener', file: 'pencil-sharpener', name: 'Sharpener Brute', height: 223, // was 220
+            walk: {
+                texture: 'enemy-sharpener-walk', file: 'pencil-sharpener-walk',
+                frames: 4, frameWidth: 269, frameHeight: 300, fps: 6, stride: 47, faceLeft: true,
+            },
+        },
         // Made from one drawing by scripts/make-eraser-variants.py. The mini-boss's height includes its horns.
-        eraser_miniboss: { texture: 'enemy-eraser-boss', file: 'eraser-boss', name: 'Eraser Overlord', height: 340, faceLeft: true },
-        eraser_giant: { texture: 'enemy-eraser-giant', file: 'eraser-giant', name: 'Giant Eraser', height: 185, faceLeft: true },
-        eraser_large: { texture: 'enemy-eraser-big', file: 'eraser-big', name: 'Large Eraser', height: 150, faceLeft: true },
-        eraser: { texture: 'enemy-eraser', file: 'eraser', name: 'Eraser', height: 125, faceLeft: true },
-        eraser_baby: { texture: 'enemy-eraser-baby', file: 'eraser-baby', name: 'Baby Eraser', height: 80, faceLeft: true },
+        eraser_miniboss: {
+            texture: 'enemy-eraser-boss', file: 'eraser-boss', name: 'Eraser Overlord', height: 345, faceLeft: true, // was 340
+            walk: {
+                texture: 'enemy-eraser-boss-walk', file: 'eraser-boss-walk',
+                frames: 4, frameWidth: 222, frameHeight: 300, fps: 6, stride: 60, faceLeft: true,
+            },
+        },
+        eraser_giant: {
+            texture: 'enemy-eraser-giant', file: 'eraser-giant', name: 'Giant Eraser', height: 188, faceLeft: true, // was 185
+            walk: {
+                texture: 'enemy-eraser-giant-walk', file: 'eraser-giant-walk',
+                frames: 4, frameWidth: 265, frameHeight: 300, fps: 6, stride: 39, faceLeft: true,
+            },
+        },
+        eraser_large: {
+            texture: 'enemy-eraser-big', file: 'eraser-big', name: 'Large Eraser', height: 152, faceLeft: true, // was 150
+            walk: {
+                texture: 'enemy-eraser-big-walk', file: 'eraser-big-walk',
+                frames: 4, frameWidth: 277, frameHeight: 300, fps: 6, stride: 32, faceLeft: true,
+            },
+        },
+        eraser: {
+            texture: 'enemy-eraser', file: 'eraser', name: 'Eraser', height: 127, faceLeft: true, // was 125
+            walk: {
+                texture: 'enemy-eraser-walk', file: 'eraser-walk',
+                frames: 4, frameWidth: 265, frameHeight: 300, fps: 6, stride: 27, faceLeft: true,
+            },
+        },
+        eraser_baby: {
+            texture: 'enemy-eraser-baby', file: 'eraser-baby', name: 'Baby Eraser', height: 81, faceLeft: true, // was 80
+            walk: {
+                texture: 'enemy-eraser-baby-walk', file: 'eraser-baby-walk',
+                frames: 4, frameWidth: 308, frameHeight: 300, fps: 6, stride: 16, faceLeft: true,
+            },
+        },
     },
     boss: { texture: 'enemy-charcoal-book', file: 'charcoal-book', name: 'The Cursed Tome', height: 200 },
 };

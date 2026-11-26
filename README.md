@@ -103,6 +103,16 @@ Gameplay
     Quit to Menu -> host ends gameplay and shows existing Main Menu
 ```
 
+### Screen transitions
+
+Every screen change (menu <-> map, classrooms <-> islands, map -> level/minigame, restart, back to map,
+next classroom) uses the same quick fade: the screen goes black, holds for a moment, then fades back in.
+Tune it in one place: `FADE_TRANSITION` in `src/ui/fadeTransition.ts` (fade-out, hold and fade-in times,
+colour, or `enabled: false`). DOM screens call `fadeTransition(swap)`; Phaser scenes call
+`startSceneWithTransition` / `restartSceneWithTransition` from `src/ui/sceneTransition.ts` instead of
+`scene.start` / `scene.restart`. Without Web Animations (jsdom tests) or with reduced motion, the change
+happens instantly.
+
 Only the Map / Main Menu / classroom / Back UI routes are implemented internally. Every gameplay destination is a host callback. Keep the reusable menu/map instance when entering gameplay by hiding `ui.element`; restore it and call `showMap()` or `showMainMenu()` on return. `showMap()` opens the classroom screen. It does not directly open a particular classroom or island. Use `destroy()` when a UI is permanently unloaded.
 
 ## Main menu interface
