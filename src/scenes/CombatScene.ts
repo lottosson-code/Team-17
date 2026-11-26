@@ -7,9 +7,12 @@ import { Effects } from '../combat/view/Effects';
 import { EnemySprite, createWalkAnimations } from '../combat/view/EnemySprite';
 import { Hud } from '../combat/view/Hud';
 import { laneDanger, lowHealthLevel } from '../combat/view/hudLogic';
+import { meetEnemy, type EnemyIntro } from '../combat/view/enemyIntros';
+import { EnemyInfoCard, NewEnemyTags } from '../combat/view/NewEnemyTags';
+import { seenEnemiesStore } from '../state/seenEnemiesStore';
 import { createTextures } from '../combat/view/textures';
 import { CURSED_CLASSROOM, DEPTH, enemyArt, themeTextures, wizardFeet } from '../combat/view/theme';
-import { WizardSprite } from '../combat/view/WizardSprite';
+import { WizardSprite, preloadWizard } from '../combat/view/WizardSprite';
 import { mapProgressStore } from '../state/mapProgressStore';
 import { createPauseMenu, type PauseMenuController } from '../../pause menu/index.js';
 import { createSceneOverlay } from '../ui/sceneOverlay';
@@ -57,6 +60,9 @@ export class CombatScene extends Phaser.Scene {
   private wizard!: WizardSprite;
   private effects!: Effects;
   private hud!: Hud;
+  private enemyTags!: NewEnemyTags;
+  /** Open while the player reads about a new enemy; the game is paused until it closes. */
+  private enemyInfo: EnemyInfoCard | undefined;
   private enemySprites = new Map<number, EnemySprite>();
 
   private typed = '';
@@ -91,11 +97,13 @@ export class CombatScene extends Phaser.Scene {
     this.paused = false;
     this.victoryActive = false;
     this.walkInReady = undefined;
+    this.enemyInfo = undefined;
   }
 
   preload(): void {
     this.load.font('Lora', 'assets/fonts/Lora-Variable.woff', 'woff');
     this.load.font('Poppins', 'assets/fonts/Poppins-Bold.woff', 'woff');
+    preloadWizard(this);
     for (const art of themeTextures(THEME)) {
       if (!this.textures.exists(art.texture)) this.load.image(art.texture, `assets/combat/enemies/${art.file}.webp`);
       const walk = art.walk;
@@ -124,6 +132,7 @@ export class CombatScene extends Phaser.Scene {
       onMenu: () => this.toMenu(),
       onContinue: () => this.continueToNextLevel(),
     });
+    this.enemyTags = new NewEnemyTags(this, THEME, intro => this.openEnemyInfo(intro));
 
     const host = createSceneOverlay(this);
     this.overlayHost = host;
@@ -232,8 +241,10 @@ export class CombatScene extends Phaser.Scene {
 
   update(time: number, delta: number): void {
     if (!this.paused) {
+      const dt = Math.min(delta, MAX_FRAME_MS);
       this.animTime += delta;
-      this.handleEvents(this.model.tick(Math.min(delta, MAX_FRAME_MS)));
+      this.handleEvents(this.model.tick(dt));
+      this.enemyTags.update(dt);
     }
 
     const enemies = this.model.getEnemies();
@@ -252,6 +263,11 @@ export class CombatScene extends Phaser.Scene {
   // ---------------------------------------------------------------- input
 
   private onKey(event: KeyboardEvent): void {
+    // While an enemy's info card is open, keys only close it (so R or M can't restart or leave).
+    if (this.enemyInfo) {
+      if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') this.closeEnemyInfo();
+      return;
+    }
     // Ignore scene hotkeys while a child confirmation or settings modal is open
     if (this.settingsModal || this.quitModal) return;
 
@@ -321,23 +337,43 @@ export class CombatScene extends Phaser.Scene {
     }
   }
 
-  private pauseGame(): void {
+  /** Stops the game. `showMenu` is false when something else (an enemy's info card) is shown instead. */
+  private pauseGame(showMenu = true): void {
     if (this.paused) return;
     this.paused = true;
     this.tweens.pauseAll();
+    this.wizard.setPaused(true);
     this.time.paused = true;
     soundManager.pauseMusicTrack();
     soundManager.playSfx('modalOpen');
-    this.pauseMenu?.setVisible(true);
+    if (showMenu) this.pauseMenu?.setVisible(true);
   }
 
   private unpauseGame(): void {
     if (!this.paused) return;
     this.paused = false;
     this.pauseMenu?.setVisible(false);
+    this.enemyInfo?.destroy();
+    this.enemyInfo = undefined;
     this.tweens.resumeAll();
     soundManager.resumeMusicTrack();
+    this.wizard.setPaused(false);
     this.time.paused = false;
+  }
+
+  /** A "New enemy" tag was clicked: pause and describe the enemy. Returns false if it can't open now. */
+  private openEnemyInfo(intro: EnemyIntro): boolean {
+    const status = this.model.getStatus();
+    if (this.paused || status === 'won' || status === 'lost') return false;
+    this.pauseGame(false);
+    this.enemyInfo = new EnemyInfoCard(this, intro, enemyArt(THEME, intro.art), () => this.closeEnemyInfo());
+    return true;
+  }
+
+  private closeEnemyInfo(): void {
+    if (!this.enemyInfo) return;
+    soundManager.playSfx('modalClose');
+    this.unpauseGame();
   }
 
   private triggerVictory(): void {
@@ -348,7 +384,7 @@ export class CombatScene extends Phaser.Scene {
     soundManager.stopMusicTrack();
     playEffect(SFX.victory);
     mapProgressStore.completeLevel(this.moduleId, this.levelId);
-    this.hud.showOverlay('won');
+    this.hud.showOverlay('won', this.model.getStats());
   }
 
   /**
@@ -442,13 +478,13 @@ export class CombatScene extends Phaser.Scene {
           soundManager.stopMusicTrack();
           playEffect(SFX.victory);
           mapProgressStore.completeLevel(this.moduleId, this.levelId);
-          this.hud.showOverlay('won');
+          this.hud.showOverlay('won', this.model.getStats());
           break;
         case 'lost':
           soundManager.stopMusicTrack();
           playEffect(SFX.gameOver);
           this.wizard.defeat();
-          this.hud.showOverlay('lost');
+          this.hud.showOverlay('lost', this.model.getStats());
           break;
         // enemySpawned / enemySplit / newProblem / enemyReachedPlayer / cutsceneEnded: update() picks these up.
         // (A split's new enemies get sprites in update(), where the parent stood; its death plays on 'enemyDefeated'.)
@@ -462,7 +498,7 @@ export class CombatScene extends Phaser.Scene {
     this.hud.flashInput('correct');
     if (!sprite) return;
     const target = sprite.centre();
-    this.wizard.cast(target);
+    this.wizard.cast();
     this.effects.bolt(this.wizard.tip(), target);
     this.effects.impact(target);
     this.effects.correct(target);
@@ -501,6 +537,9 @@ export class CombatScene extends Phaser.Scene {
   private createEnemySprite(enemy: Readonly<Enemy>): EnemySprite {
     const sprite = new EnemySprite(this, enemy, enemyArt(THEME, enemy.kind.id));
     this.enemySprites.set(enemy.id, sprite);
+    // Every enemy gets its sprite here (spawned, split or walked in), so this is where it first appears.
+    const intro = meetEnemy(enemy.kind.id, seenEnemiesStore);
+    if (intro) this.enemyTags.show(intro);
     return sprite;
   }
 

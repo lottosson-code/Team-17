@@ -123,6 +123,7 @@ vi.mock('../../ui/quitModal', () => ({
 import { MainMenuScene } from '../MainMenuScene';
 import { soundManager } from '../../audio/soundManager';
 import { mapProgressStore } from '../../state/mapProgressStore';
+import { seenEnemiesStore } from '../../state/seenEnemiesStore';
 // Last-played save used by Continue.
 import { clearLastPlayed, loadLastPlayed, saveLastPlayed } from '../../ui/lastPlayed';
 
@@ -169,6 +170,15 @@ describe('MainMenuScene', () => {
     expect(playSfxSpy).toHaveBeenCalledWith('click');
     expect(resetProgressSpy).toHaveBeenCalledTimes(1);
     expect(mockGameUIController.showMap).toHaveBeenCalledTimes(1);
+  });
+
+  it('forgets which enemies the player has met when newGame is clicked', () => {
+    scene.create();
+    seenEnemiesStore.markSeen('pencil');
+
+    capturedGameUIOptions.menu!.callbacks!.newGame({ action: 'newGame' });
+
+    expect(seenEnemiesStore.hasSeen('pencil')).toBe(false);
   });
 
   it('navigates to map and plays click sound without resetting progress when continue is clicked', () => {
