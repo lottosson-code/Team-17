@@ -257,7 +257,9 @@ export class Make24Model {
 
   /** The player tapped an operation. Tapping the chosen one again un-chooses it. */
   pickOperation(op: Op): MoveOutcome | null {
-    if (this.solved) return null;
+    // With one card left there is nothing to combine it with, so an operation
+    // (for example from a keyboard shortcut) must not be remembered.
+    if (this.solved || this.cards.length < 2) return null;
     if (this.selectedId === null) return { kind: 'no-card-selected' };
 
     if (this.pendingOp === op) {

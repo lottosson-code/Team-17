@@ -144,6 +144,11 @@ export class Make24View {
     return target === this.tutorialEl;
   }
 
+  /** True if the element is part of the how-to-play card (its backdrop, card or buttons). */
+  isInsideTutorial(element: Element): boolean {
+    return this.tutorialEl.contains(element);
+  }
+
   /** False when the game is hidden or not on the page, so keys shouldn't control it. */
   get isVisible(): boolean {
     return this.root.getClientRects().length > 0;
