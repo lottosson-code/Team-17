@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { heartFills, POWER_UP_TEXTURE } from './hudLogic';
 import { DEPTH } from './theme';
 import { TEX } from './textures';
+import { WIZARD_FACE, WIZARD_SHEET } from './wizardArt';
 import type { PowerUpKind } from '../types';
 
 // The combat HUD: player portrait and hearts, level banner with wave progress, pause button,
@@ -76,7 +77,8 @@ export class Hud {
         const portrait = add.graphics();
         hud(portrait);
         portrait.fillStyle(0x1b1430).fillCircle(66, 60, 48);
-        const face = add.image(66, 116, 'wizard-body').setScale(0.82);
+        const face = add.image(66, 60, WIZARD_SHEET.texture, WIZARD_FACE.frame)
+            .setOrigin(WIZARD_FACE.x / WIZARD_SHEET.frameWidth, WIZARD_FACE.y / WIZARD_SHEET.frameHeight).setScale(0.62);
         hud(face);
         const faceMask = scene.make.graphics({}, false).fillStyle(0xffffff).fillCircle(66, 60, 44);
         face.setMask(faceMask.createGeometryMask());

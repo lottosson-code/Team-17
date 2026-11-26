@@ -9,7 +9,7 @@ import { Hud } from '../combat/view/Hud';
 import { laneDanger, lowHealthLevel } from '../combat/view/hudLogic';
 import { createTextures } from '../combat/view/textures';
 import { CURSED_CLASSROOM, DEPTH, enemyArt, themeTextures, wizardFeet } from '../combat/view/theme';
-import { WizardSprite } from '../combat/view/WizardSprite';
+import { WizardSprite, preloadWizard } from '../combat/view/WizardSprite';
 import { mapProgressStore } from '../state/mapProgressStore';
 import { createPauseMenu, type PauseMenuController } from '../../pause menu/index.js';
 import { createSceneOverlay } from '../ui/sceneOverlay';
@@ -68,6 +68,7 @@ export class CombatScene extends Phaser.Scene {
   preload(): void {
     this.load.font('Lora', 'assets/fonts/Lora-Variable.woff', 'woff');
     this.load.font('Poppins', 'assets/fonts/Poppins-Bold.woff', 'woff');
+    preloadWizard(this);
     for (const art of themeTextures(THEME)) {
       if (!this.textures.exists(art.texture)) this.load.image(art.texture, `assets/combat/enemies/${art.file}.webp`);
       const walk = art.walk;
@@ -240,6 +241,7 @@ export class CombatScene extends Phaser.Scene {
     if (this.paused) return;
     this.paused = true;
     this.tweens.pauseAll();
+    this.wizard.setPaused(true);
     this.time.paused = true;
     soundManager.playSfx('modalOpen');
     this.pauseMenu?.setVisible(true);
@@ -250,6 +252,7 @@ export class CombatScene extends Phaser.Scene {
     this.paused = false;
     this.pauseMenu?.setVisible(false);
     this.tweens.resumeAll();
+    this.wizard.setPaused(false);
     this.time.paused = false;
   }
 
@@ -342,7 +345,7 @@ export class CombatScene extends Phaser.Scene {
     this.hud.flashInput('correct');
     if (!sprite) return;
     const target = sprite.centre();
-    this.wizard.cast(target);
+    this.wizard.cast();
     this.effects.bolt(this.wizard.tip(), target);
     this.effects.impact(target);
     this.effects.correct(target);
