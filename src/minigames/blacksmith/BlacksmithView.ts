@@ -232,6 +232,9 @@ export class BlacksmithView implements BlacksmithViewInterface {
             fontFamily: FONT_FAMILY,
             fontSize: 16,
             fill: COLOR_CREAM_TEXT,
+            shadowColor: '#000000',
+            shadowBlur: 4,
+            shadowOffset: { x: 1, y: 1 },
             align: 'center',
         });
         this.rootGroup.add(this.feedbackText);
@@ -457,6 +460,9 @@ export class BlacksmithView implements BlacksmithViewInterface {
                 fontFamily: FONT_FAMILY,
                 fontSize: 13,
                 fill: COLOR_CREAM_TEXT,
+                shadowColor: '#000000',
+                shadowBlur: 4,
+                shadowOffset: { x: 1, y: 1 },
                 align: 'center',
             });
             this.answersGroup.add(labelText);
