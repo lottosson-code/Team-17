@@ -15,6 +15,7 @@ import featherImgUrl from './assets/feather.png';
 import potionImgUrl from './assets/potion.png';
 import ingotImgUrl from './assets/ingot.png';
 import blacksmithBgUrl from './assets/blacksmith-bg.jpg';
+import chalkboardTextureUrl from './assets/chalkboard.jpg';
 
 const ITEM_IMAGES: Record<ItemId, string> = {
     feather: featherImgUrl,
@@ -134,7 +135,7 @@ export class BlacksmithView implements BlacksmithViewInterface {
             fontStyle: 'bold',
             fill: COLOR_CREAM_TEXT,
             shadowColor: '#000000',
-            shadowBlur: 4,
+            shadowBlur: 3,
             align: 'center',
         });
         this.rootGroup.add(title);
@@ -180,6 +181,25 @@ export class BlacksmithView implements BlacksmithViewInterface {
             cornerRadius: 6,
         });
         this.rootGroup.add(chalkboard);
+
+        // Load chalk texture onto the chalkboard rect
+        if (typeof window !== 'undefined') {
+         const chalkImg = new window.Image();
+         chalkImg.src = chalkboardTextureUrl;
+         chalkImg.onload = () => {
+             chalkboard.fillPatternImage(chalkImg);
+             chalkboard.fillPatternScale({
+                 x: chalkboard.width() / chalkImg.width,
+                 y: chalkboard.height() / chalkImg.height,
+             });
+             chalkboard.fillPriority('pattern');
+
+             const layer = this.rootGroup.getLayer();
+             if (layer !== null) {
+                 layer.batchDraw();
+             }
+         };
+     }
 
         this.boardGroup = new Konva.Group({ x: 200, y: 105 });
         this.rootGroup.add(this.boardGroup);
@@ -232,9 +252,11 @@ export class BlacksmithView implements BlacksmithViewInterface {
             fontFamily: FONT_FAMILY,
             fontSize: 16,
             fill: COLOR_CREAM_TEXT,
+            fontStyle: 'bold',
             shadowColor: '#000000',
-            shadowBlur: 4,
-            shadowOffset: { x: 1, y: 1 },
+            shadowBlur: 3,
+            shadowOffset: { x: 2, y: 2 },
+            shadowOpacity: 0.9,
             align: 'center',
         });
         this.rootGroup.add(this.feedbackText);
@@ -473,8 +495,8 @@ export class BlacksmithView implements BlacksmithViewInterface {
                 fontSize: 13,
                 fill: COLOR_CREAM_TEXT,
                 shadowColor: '#000000',
-                shadowBlur: 4,
-                shadowOffset: { x: 1, y: 1 },
+                shadowBlur: 2,
+                shadowOffset: { x: 2, y: 2 },
                 align: 'center',
             });
             this.answersGroup.add(labelText);
