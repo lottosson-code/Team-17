@@ -126,6 +126,16 @@ describe('picking cards and operations', () => {
     model.pickOperation('*');
     expect(model.pendingOp).toBeNull();
   });
+
+  it('ignores an operation when only one card is left', () => {
+    const model = modelWith([1, 2, 3, 4]);
+    combine(model, 0, '+', 1);
+    combine(model, 1, '+', 2);
+    combine(model, 2, '+', 3); // 10 is the only card left, so this is a wrong total
+    model.pickCard(idInSlot(model, 3)); // select the last card, like pressing "4" on the keyboard
+    expect(model.pickOperation('+')).toBeNull();
+    expect(model.pendingOp).toBeNull();
+  });
 });
 
 describe('combining cards', () => {
