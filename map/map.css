@@ -17,43 +17,126 @@
 .cse-map__title { position: absolute; z-index: 2; top: 7%; left: 20%; right: 20%; margin: 0; text-align: center; font-size: 4cqw; line-height: 1.12; text-shadow: 0 .2cqw .12cqw #171b1b, 0 .3cqw 1.3cqw #0008; pointer-events: none; }
 .cse-map__content { position: absolute; inset: 0; }
 
-/* Only the painted area and label accept pointer input, not the button box. */
-.cse-map__room, .cse-map__island { position: absolute; pointer-events: none; cursor: default; }
-.cse-map__room-area, .cse-map__island-area, .cse-map__label { pointer-events: auto; cursor: pointer; }
-.cse-map__room { left: calc(1.4% + var(--room-index) * 33.25%); top: 30%; width: 30.6%; height: 44%; }
-.cse-map__room-area { position: absolute; inset: 0; }
-.cse-map__room:hover .cse-map__room-area { background: radial-gradient(ellipse at 50% 68%, #edc77712, transparent 75%); }
-.cse-map__label { display: inline-block; white-space: nowrap; font-size: 1.9cqw; line-height: 1.3; text-shadow: 0 .15cqw .35cqw #020810; transition: color .15s, text-shadow .15s; }
-.cse-map__room .cse-map__label { position: absolute; top: calc(100% + 3.2cqw); left: 50%; transform: translateX(-50%); }
-.cse-map__bridges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.cse-map__bridge { pointer-events: none; }
-.cse-map__island { z-index: 1; top: var(--y); left: var(--x); width: var(--island-width); transform: translateX(-50%); text-align: center; }
-.cse-map__sprite { display: block; width: 100%; aspect-ratio: 3 / 5; background-image: url('../assets/map/islands.png'); background-size: 500% auto; background-position-y: 50%; background-repeat: no-repeat; clip-path: inset(0 3%); filter: drop-shadow(0 .8cqw .65cqw #020a10aa); transition: filter .15s; pointer-events: none; }
-.cse-map__island-area { position: absolute; top: 0; left: 0; width: 100%; aspect-ratio: 3 / 5; }
-.cse-map__island .cse-map__label { position: relative; margin-top: -.45cqw; font-size: 1.5cqw; }
-.cse-map__island:hover .cse-map__sprite { filter: drop-shadow(0 .7cqw .8cqw #020a10aa) brightness(1.12); }
-.cse-map__room:hover .cse-map__label, .cse-map__island:hover .cse-map__label { color: #fff9e5; text-shadow: 0 0 .6cqw #d8b56a88, 0 .15cqw .35cqw #020810; }
-
-/* Locked states for rooms and islands */
-.cse-map__room[disabled],
-.cse-map__island[disabled] {
-  opacity: 0.38;
-  filter: grayscale(0.85);
-  cursor: not-allowed;
+.cse-map[data-view="rooms"] {
+  background: radial-gradient(ellipse at 50% 52%, #244044, #131d24 76%, #0b131a);
 }
-
-.cse-map__room[disabled] .cse-map__room-area,
-.cse-map__room[disabled] .cse-map__label,
-.cse-map__island[disabled] .cse-map__island-area,
-.cse-map__island[disabled] .cse-map__label {
-  cursor: not-allowed;
+.cse-map .cse-map__room {
+  position: absolute;
+  left: calc(3.8% + var(--room-index) * 31.3%);
+  top: 20%;
+  width: 29.8%;
+  height: 69%;
+  overflow: hidden;
+  border: 1px solid #d7c4a54d;
+  box-shadow: 0 .8cqw 1.8cqw #02090c99;
+  cursor: pointer;
+}
+.cse-map__room-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 50%;
+  pointer-events: none;
+  transition: filter .15s;
+}
+.cse-map__room::after {
+  content: '';
+  position: absolute;
+  inset: 58% 0 0;
+  background: linear-gradient(transparent, #0a1018e8);
   pointer-events: none;
 }
+.cse-map__label {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 1.9cqw;
+  line-height: 1.3;
+  text-shadow: 0 .15cqw .35cqw #020810;
+  transition: color .15s, text-shadow .15s;
+}
+.cse-map__room .cse-map__label {
+  position: absolute;
+  z-index: 1;
+  bottom: 5%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.cse-map .cse-map__room:disabled { cursor: not-allowed; color: #d2c8b0; }
+.cse-map__room:disabled .cse-map__room-preview { filter: brightness(.59) saturate(.76); }
+.cse-map .cse-map__room:enabled:is(:hover, :focus-visible) { border-color: #f0d596; }
+.cse-map__room:enabled:is(:hover, :focus-visible) .cse-map__room-preview { filter: brightness(1.12); }
 
-.cse-map__room[disabled]:hover .cse-map__label,
-.cse-map__island[disabled]:hover .cse-map__label {
-  color: inherit;
-  text-shadow: none;
+.cse-map__bridges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.cse-map__bridge { pointer-events: none; }
+.cse-map__island {
+  position: absolute;
+  z-index: 1;
+  top: var(--y);
+  left: var(--x);
+  width: var(--island-width);
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+}
+.cse-map__sprite {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 .55cqw .55cqw #020a10ad);
+  transition: filter .15s;
+  pointer-events: none;
+}
+.cse-map__island-area {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+.cse-map__island-outline {
+  fill: transparent;
+  fill-rule: evenodd;
+  stroke: #b9c4cf;
+  stroke-width: 2.8;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 1.5px #56616d);
+  pointer-events: visiblePainted;
+  cursor: pointer;
+}
+.cse-map__island .cse-map__label { position: relative; margin-top: -.12cqw; font-size: 1.55cqw; }
+.cse-map__island:enabled:is(:hover, :focus-visible) .cse-map__sprite {
+  filter: drop-shadow(0 .35cqw .6cqw #020a10aa) brightness(1.13);
+}
+.cse-map__island:enabled:is(:hover, :focus-visible) .cse-map__island-outline { stroke: #eef5fc; stroke-width: 4; }
+.cse-map__island:enabled:is(:hover, :focus-visible) .cse-map__label,
+.cse-map__room:enabled:is(:hover, :focus-visible) .cse-map__label { color: #fff9e5; text-shadow: 0 0 .6cqw #d8b56a88, 0 .15cqw .35cqw #020810; }
+.cse-map__island:disabled { opacity: .46; filter: grayscale(.76); }
+.cse-map__island:disabled .cse-map__island-outline { pointer-events: none; }
+
+.cse-map .cse-map__next-classroom {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--level-y) + var(--level-height) + 2.9cqw);
+  left: var(--level-x);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  width: 13cqw;
+  height: 5.9cqw;
+  padding-inline-start: 1cqw;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+  background: #493323f5;
+  color: #fff0be;
+  font-size: 1.25cqw;
+  line-height: 1.1;
+  cursor: pointer;
+}
+.cse-map__next-classroom span { inline-size: min-content; text-align: center; }
+.cse-map .cse-map__next-classroom:is(:hover, :focus-visible) {
+  background: #795a3c;
+  color: #fff9e5;
 }
 
 /* A soft mask fades all four edges without adding a visible border. */
@@ -63,8 +146,6 @@
 .cse-map button:focus-visible { outline: none; }
 .cse-map__room:focus-visible .cse-map__label, .cse-map__island:focus-visible .cse-map__label { text-decoration: underline; text-underline-offset: .35cqw; text-shadow: 0 0 .6cqw #f6d992; }
 .cse-map .cse-map__back:focus-visible { background: #ac854ee8; text-decoration: underline; }
-.cse-map[data-room='olive'] .cse-map__background { filter: hue-rotate(12deg); }
-.cse-map[data-room='blue'] .cse-map__background { filter: hue-rotate(-9deg) saturate(.85); }
 .cse-map__sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .cse-map * { transition: none !important; } }
 

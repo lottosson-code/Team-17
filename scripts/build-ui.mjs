@@ -33,5 +33,5 @@ function copySelected(source, target, extensions) {
 for (const module of ['main menu', 'map', 'pause menu']) {
   copySelected(join(root, module), join(output, module), ['.css']);
 }
-copySelected(join(root, 'assets'), join(output, 'assets'), ['.png', '.svg']);
+copySelected(join(root, 'assets'), join(output, 'assets'), ['.png', '.svg', '.webp']);
 console.log('Built current standalone modules, styles and shared artwork in dist/ui/.');

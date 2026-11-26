@@ -6,6 +6,8 @@ import { BlacksmithController } from '../minigames/blacksmith/BlacksmithControll
 import { createSceneOverlay } from '../ui/sceneOverlay';
 import { mapProgressStore } from '../state/mapProgressStore';
 import { soundManager } from '../audio/soundManager';
+// [Added] Shared fade-to-black transition back to the map.
+import { startSceneWithTransition } from '../ui/sceneTransition';
 
 export interface BlacksmithSceneData {
   moduleId?: number;
@@ -63,7 +65,8 @@ export class BlacksmithScene extends Phaser.Scene {
       },
       onExitToMap: () => {
         soundManager.playSfx('click');
-        this.scene.start('MainMenu', { showMap: true, roomIndex: this.moduleId - 1 });
+        // [Changed] Was this.scene.start(...); now behind the shared fade-to-black transition.
+        void startSceneWithTransition(this, 'MainMenu', { showMap: true, roomIndex: this.moduleId - 1 });
       },
     });
 

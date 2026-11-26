@@ -38,4 +38,5 @@ export const MAP_TEXT = {
   mainMenu: 'Main Menu',
   // placeholder：Submap's return-to-classrooms button label.
   back: 'Back',
+  nextClassroom: 'Next Classroom',
 };

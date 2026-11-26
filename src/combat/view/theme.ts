@@ -1,4 +1,4 @@
-import { LANE_PATHS, perspectiveBox } from '../laneLayout';
+import { perspectiveBox } from '../laneLayout';
 
 // Look and layout of a battlefield. Everything the scene draws reads its positions and colours
 // from a theme, so another module can reuse all the drawing code with different values and art.
@@ -16,15 +16,14 @@ export interface Rect {
     h: number;
 }
 
-/** A walk cycle: one row of equally sized frames, made with scripts/make-spritesheet.py. */
+/** A walk cycle of equally sized frames, ordered left to right and top to bottom. */
 export interface WalkAnimation {
     texture: string; // Spritesheet key, loaded from public/assets/combat/enemies/<file>.webp
     file: string;
     frames: number;
     frameWidth: number;
     frameHeight: number;
-    fps: number; // Frame rate the animation is defined with; sped up or slowed to match the walking speed
-    stride: number; // Distance one full cycle should cover, in pixels at depth scale 1 (stops the feet sliding)
+    stride: number; // Full-cycle travel in unscaled frame pixels
     faceLeft?: boolean; // True if the frames already face left (towards the wizard)
 }
 
@@ -59,6 +58,8 @@ export interface BattlefieldTheme {
         danger: number;
         moonlight: number;
         candle: number;
+        skyTop?: number; // [Added] Night sky in the windows (top/bottom); optional, defaults to the original purple
+        skyBottom?: number;
     };
     wallBottom: number; // y where the back wall meets the floor
     floorBottom: number; // y where the floor disappears behind the HUD
@@ -105,21 +106,64 @@ export const CURSED_CLASSROOM: BattlefieldTheme = {
     ],
     desk: { left: 14, right: 288, bottom: 548, height: 122, depth: 0.15, wizard: { u: 0.5, v: 0.42 } },
     enemies: {
-        pencil: { texture: 'enemy-pencil', file: 'pencil', name: 'Pencil', height: 132 },
-        textbook: {
-            texture: 'enemy-red-book', file: 'red-book', name: 'Textbook', height: 128,
+        // Generated stride distances come from the planted travel in scripts/make-walk-frames.py.
+        pencil: {
+            texture: 'enemy-pencil', file: 'pencil', name: 'Pencil', height: 138,
             walk: {
-                texture: 'enemy-red-book-walk', file: 'red-book-walk',
-                frames: 12, frameWidth: 266, frameHeight: 300, fps: 12, stride: 80, faceLeft: true,
+                texture: 'enemy-pencil-walk', file: 'pencil-walk',
+                frames: 24, frameWidth: 190, frameHeight: 300, stride: 90.8696, faceLeft: true,
             },
         },
-        miniBoss: { texture: 'enemy-sharpener', file: 'pencil-sharpener', name: 'Sharpener Brute', height: 220 },
+        textbook: {
+            texture: 'enemy-red-book', file: 'red-book', name: 'Textbook', height: 118,
+            walk: {
+                texture: 'enemy-red-book-walk', file: 'red-book-walk',
+                frames: 24, frameWidth: 266, frameHeight: 300, stride: 172, faceLeft: true,
+            },
+        },
+        miniBoss: {
+            texture: 'enemy-sharpener', file: 'pencil-sharpener', name: 'Sharpener Brute', height: 205,
+            walk: {
+                texture: 'enemy-sharpener-walk', file: 'pencil-sharpener-walk',
+                frames: 24, frameWidth: 269, frameHeight: 300, stride: 74.2069, faceLeft: true,
+            },
+        },
         // Made from one drawing by scripts/make-eraser-variants.py. The mini-boss's height includes its horns.
-        eraser_miniboss: { texture: 'enemy-eraser-boss', file: 'eraser-boss', name: 'Eraser Overlord', height: 340, faceLeft: true },
-        eraser_giant: { texture: 'enemy-eraser-giant', file: 'eraser-giant', name: 'Giant Eraser', height: 185, faceLeft: true },
-        eraser_large: { texture: 'enemy-eraser-big', file: 'eraser-big', name: 'Large Eraser', height: 150, faceLeft: true },
-        eraser: { texture: 'enemy-eraser', file: 'eraser', name: 'Eraser', height: 125, faceLeft: true },
-        eraser_baby: { texture: 'enemy-eraser-baby', file: 'eraser-baby', name: 'Baby Eraser', height: 80, faceLeft: true },
+        eraser_miniboss: {
+            texture: 'enemy-eraser-boss', file: 'eraser-boss', name: 'Eraser Overlord', height: 317, faceLeft: true,
+            walk: {
+                texture: 'enemy-eraser-boss-walk', file: 'eraser-boss-walk',
+                frames: 24, frameWidth: 222, frameHeight: 300, stride: 59.2, faceLeft: true,
+            },
+        },
+        eraser_giant: {
+            texture: 'enemy-eraser-giant', file: 'eraser-giant', name: 'Giant Eraser', height: 173, faceLeft: true,
+            walk: {
+                texture: 'enemy-eraser-giant-walk', file: 'eraser-giant-walk',
+                frames: 24, frameWidth: 265, frameHeight: 300, stride: 72.0209, faceLeft: true,
+            },
+        },
+        eraser_large: {
+            texture: 'enemy-eraser-big', file: 'eraser-big', name: 'Large Eraser', height: 140, faceLeft: true,
+            walk: {
+                texture: 'enemy-eraser-big-walk', file: 'eraser-big-walk',
+                frames: 24, frameWidth: 277, frameHeight: 300, stride: 72.02, faceLeft: true,
+            },
+        },
+        eraser: {
+            texture: 'enemy-eraser', file: 'eraser', name: 'Eraser', height: 117, faceLeft: true,
+            walk: {
+                texture: 'enemy-eraser-walk', file: 'eraser-walk',
+                frames: 24, frameWidth: 265, frameHeight: 300, stride: 72.0209, faceLeft: true,
+            },
+        },
+        eraser_baby: {
+            texture: 'enemy-eraser-baby', file: 'eraser-baby', name: 'Baby Eraser', height: 75, faceLeft: true,
+            walk: {
+                texture: 'enemy-eraser-baby-walk', file: 'eraser-baby-walk',
+                frames: 24, frameWidth: 308, frameHeight: 300, stride: 68.2395, faceLeft: true,
+            },
+        },
     },
     boss: { texture: 'enemy-charcoal-book', file: 'charcoal-book', name: 'The Cursed Tome', height: 200 },
 };
@@ -129,18 +173,24 @@ export function enemyArt(theme: BattlefieldTheme, kindId: string): EnemyArt {
     return theme.enemies[kindId] ?? theme.enemies.pencil;
 }
 
-/**
- * How much faster (> 1) or slower (< 1) than its defined fps a walk cycle should play, so that
- * one cycle covers `stride` while walking down `lane` in `walkMs`. Lanes are horizontal, so
- * the depth scale is the same along the whole lane.
- */
-export function walkTimeScale(art: EnemyArt, lane: number, walkMs: number): number {
-    const walk = art.walk;
-    const path = LANE_PATHS[lane];
-    if (!walk || !path) return 1;
-    const laneLength = (path.spawn.x - path.end.x) / path.end.scale; // Pixels at scale 1
-    const cyclesPerSecond = ((laneLength / walkMs) * 1000) / walk.stride;
-    return (cyclesPerSecond * walk.frames) / walk.fps;
+/** Attack sheets use one row per motion and preserve the walking frame's foot origin. */
+export const ENEMY_PUNCH = {
+    leftPadding: 96,
+    framesPerMotion: 8,
+    motions: [
+        { durationMs: 280, contactPose: 3 },
+        { durationMs: 380, contactPose: 4 },
+    ],
+} as const;
+
+export function enemyPunchTexture(art: EnemyArt): string {
+    return `${art.texture}-attack`;
+}
+
+/** The nearest authored pose for the distance travelled, in unscaled frame pixels. */
+export function walkFrameAtDistance(walk: WalkAnimation, distance: number, startFrame: number): number {
+    const steps = Math.round((distance / walk.stride) * walk.frames);
+    return (startFrame + steps) % walk.frames;
 }
 
 /** The desk's faces and a way to place things on its top. */

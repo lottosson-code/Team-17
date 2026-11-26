@@ -1,7 +1,13 @@
 import type { MapController, MapOptions, MapState } from './types.js';
-import { classrooms, islands, islandSprites, MAP_CONNECTIONS } from './layout.js';
+import { classrooms, islands, MAP_CONNECTIONS } from './layout.js';
 import { MAP_TEXT } from './labels.js';
 import { ASSETS } from '../assets/index.js';
+import { MAP_ART, MAP_ISLAND_SIZE, type ClassroomArtwork } from '../assets/map/reimagined/index.js';
+// [Added] Shared fade-to-black transition between the classroom list and a classroom's islands.
+import { fadeTransition } from '../src/ui/fadeTransition.js';
+
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+const ISLAND_HEIGHT_RATIO = MAP_ISLAND_SIZE.height / MAP_ISLAND_SIZE.width;
 
 function createButton(className: string): HTMLButtonElement {
   const button = document.createElement('button');
@@ -49,6 +55,7 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
     content.replaceChildren();
     state = { ...state, view };
     root.dataset.view = view;
+    background.hidden = view === 'rooms';
     title.hidden = false;
     back.hidden = view === 'rooms' && !options.onBackToMenu;
     back.textContent = view === 'rooms' ? MAP_TEXT.mainMenu : MAP_TEXT.back;
@@ -62,55 +69,62 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
     title.textContent = MAP_TEXT.classroomTitle;
     state = { ...state, roomId: null };
     root.dataset.room = '';
-    background.src = ASSETS.classrooms;
-
     classrooms.forEach((room, index) => {
+      const artwork = MAP_ART[index];
+      if (!artwork) return;
       const button = createButton('cse-map__room');
       const isUnlocked = options.isRoomUnlocked ? options.isRoomUnlocked(index) : true;
       button.dataset.roomId = room.id;
       button.style.setProperty('--room-index', String(index));
-      const area = document.createElement('span');
-      area.className = 'cse-map__room-area';
-      area.setAttribute('aria-hidden', 'true');
+      const preview = document.createElement('img');
+      preview.className = 'cse-map__room-preview';
+      preview.src = artwork.preview;
+      preview.alt = '';
+      preview.draggable = false;
       const labelText = isUnlocked
         ? MAP_TEXT.classroomPrefix + (index + 1)
         : MAP_TEXT.classroomPrefix + (index + 1) + ' 🔒';
-      button.append(area, createLabel(labelText));
+      button.append(preview, createLabel(labelText));
 
       if (!isUnlocked) {
         button.disabled = true;
         button.setAttribute('aria-disabled', 'true');
         button.title = `Module ${index + 1} Locked — Complete Module ${index} first`;
       } else {
-        button.onclick = () => showIslands(index);
+        // [Changed] Was showIslands(index) directly; now behind the fade-to-black transition.
+        button.onclick = () => { void fadeTransition(() => showIslands(index)); };
       }
       content.append(button);
       if (room.id === previousRoom) button.focus({ preventScroll: true });
     });
   }
 
-  function appendBridges(): void {
-    const namespace = 'http://www.w3.org/2000/svg';
-    const layer = document.createElementNS(namespace, 'svg');
+  function appendBridges(artwork: ClassroomArtwork): void {
+    const layer = document.createElementNS(SVG_NAMESPACE, 'svg');
     layer.classList.add('cse-map__bridges');
     layer.setAttribute('viewBox', '0 0 1600 900');
     layer.setAttribute('aria-hidden', 'true');
 
     MAP_CONNECTIONS.forEach(connection => {
-      const from = islands[connection.fromLevel - 1];
-      const to = islands[connection.toLevel - 1];
-      if (!from || !to) return;
+      const from = connection.fromLevel - 1;
+      const to = connection.toLevel - 1;
+      const fromIsland = islands[from];
+      const toIsland = islands[to];
+      if (!fromIsland || !toIsland) return;
 
       // Draw left to right so railings stay above the deck on a leftward branch.
-      const left = from.x <= to.x ? from : to;
-      const right = from.x <= to.x ? to : from;
+      const [leftIndex, rightIndex] = fromIsland.x <= toIsland.x ? [from, to] : [to, from];
+      const left = islands[leftIndex];
+      const right = islands[rightIndex];
+      const leftArt = artwork.islands[leftIndex];
+      const rightArt = artwork.islands[rightIndex];
+      if (!left || !right || !leftArt || !rightArt) return;
 
-      // Work in a fixed 16:9 coordinate system; SVG scales with the map.
-      // The walkway meets each sprite near its grassy top surface.
+      // Work in the map's fixed 16:9 coordinates and meet each island at its deck.
       const fromX = left.x * 16;
-      const fromY = left.y * 9 + left.width * 16 * 5 / 3 * .69;
+      const fromY = left.y * 9 + left.width * 16 * ISLAND_HEIGHT_RATIO * leftArt.deck;
       const toX = right.x * 16;
-      const toY = right.y * 9 + right.width * 16 * 5 / 3 * .69;
+      const toY = right.y * 9 + right.width * 16 * ISLAND_HEIGHT_RATIO * rightArt.deck;
       const dx = toX - fromX;
       const dy = toY - fromY;
       const distance = Math.hypot(dx, dy);
@@ -120,9 +134,9 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
       const y = fromY + dy / distance * startInset;
       const angle = Math.atan2(dy, dx) * 180 / Math.PI;
 
-      const group = document.createElementNS(namespace, 'g');
+      const group = document.createElementNS(SVG_NAMESPACE, 'g');
       group.setAttribute('transform', 'translate(' + x + ' ' + y + ') rotate(' + angle + ')');
-      const image = document.createElementNS(namespace, 'image');
+      const image = document.createElementNS(SVG_NAMESPACE, 'image');
       image.classList.add('cse-map__bridge');
       image.setAttribute('data-from', String(connection.fromLevel));
       image.setAttribute('data-to', String(connection.toLevel));
@@ -140,16 +154,17 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
 
   function showIslands(roomIndex: number): void {
     const room = classrooms[roomIndex];
-    if (destroyed || !room) return;
+    const classroomArt = MAP_ART[roomIndex];
+    if (destroyed || !room || !classroomArt) return;
     setView('islands');
     title.textContent = MAP_TEXT.submapTitles[roomIndex] || MAP_TEXT.classroomTitle;
     state = { ...state, roomId: room.id };
     root.dataset.room = room.tint;
-    background.src = ASSETS.dream;
-    appendBridges();
+    background.src = classroomArt.background;
+    appendBridges(classroomArt);
 
     islands.forEach((island, index) => {
-      const artwork = islandSprites[island.spriteIndex];
+      const artwork = classroomArt.islands[index];
       if (!artwork) return;
       const button = createButton('cse-map__island');
       const levelId = room.id + '-level-0' + (index + 1);
@@ -165,15 +180,22 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
       button.style.setProperty('--y', island.y + '%');
       button.style.setProperty('--island-width', island.width + '%');
 
-      // Artwork and pointer area are separate: transparent sky must not click.
-      const sprite = document.createElement('span');
+      const sprite = document.createElement('img');
       sprite.className = 'cse-map__sprite';
-      sprite.style.backgroundPositionX = island.spriteIndex * 25 + '%';
-      sprite.setAttribute('aria-hidden', 'true');
-      const area = document.createElement('span');
-      area.className = 'cse-map__island-area';
-      area.style.clipPath = artwork.shape;
+      sprite.src = artwork.src;
+      sprite.width = MAP_ISLAND_SIZE.width;
+      sprite.height = MAP_ISLAND_SIZE.height;
+      sprite.alt = '';
+      sprite.draggable = false;
+      // The same traced path draws the outline and receives pointer input.
+      const area = document.createElementNS(SVG_NAMESPACE, 'svg');
+      area.classList.add('cse-map__island-area');
+      area.setAttribute('viewBox', '0 0 ' + MAP_ISLAND_SIZE.width + ' ' + MAP_ISLAND_SIZE.height);
       area.setAttribute('aria-hidden', 'true');
+      const outline = document.createElementNS(SVG_NAMESPACE, 'path');
+      outline.classList.add('cse-map__island-outline');
+      outline.setAttribute('d', artwork.path);
+      area.append(outline);
       let name = island.route === 'branch' ? MAP_TEXT.minigameNames[index - 5] : MAP_TEXT.levelNames[index];
       if (isCompleted) {
         name = '✓ ' + (name || '');
@@ -191,7 +213,27 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
       }
       content.append(button);
     });
+    appendNextClassroom(roomIndex);
     content.querySelector<HTMLButtonElement>('.cse-map__island')?.focus({ preventScroll: true });
+  }
+
+  function appendNextClassroom(roomIndex: number): void {
+    const nextRoomIndex = roomIndex + 1;
+    const finalLevel = MAP_TEXT.levelNames.length;
+    if (!classrooms[nextRoomIndex] ||
+        !options.isLevelCompleted?.(roomIndex, finalLevel) ||
+        options.isRoomUnlocked?.(nextRoomIndex) === false) return;
+    const finalIsland = islands[finalLevel - 1];
+    if (!finalIsland) return;
+    const button = createButton('cse-map__next-classroom');
+    button.style.setProperty('--level-x', finalIsland.x + '%');
+    button.style.setProperty('--level-y', finalIsland.y + '%');
+    button.style.setProperty('--level-height', (finalIsland.width * ISLAND_HEIGHT_RATIO) + 'cqw');
+    const label = document.createElement('span');
+    label.textContent = MAP_TEXT.nextClassroom;
+    button.append(label);
+    button.onclick = () => { void fadeTransition(() => showIslands(nextRoomIndex)); };
+    content.append(button);
   }
 
   function selectLevel(button: HTMLButtonElement, roomId: string, levelId: string, levelNumber: number): void {
@@ -224,13 +266,15 @@ export function createMap(host: HTMLElement, options: MapOptions = {}): MapContr
 
   back.onclick = () => {
     if (destroyed) return;
-    if (state.view === 'islands') showRooms();
+    // [Changed] Islands -> classrooms fades through black (the menu side does its own in game-ui.ts).
+    if (state.view === 'islands') void fadeTransition(showRooms);
     else options.onBackToMenu?.();
   };
   root.onkeydown = event => {
     if (event.key === 'Escape' && state.view === 'islands') {
       event.preventDefault();
-      showRooms();
+      // [Changed] Same fade as the Back button.
+      void fadeTransition(showRooms);
     }
   };
   host.append(root);
