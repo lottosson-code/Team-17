@@ -118,6 +118,16 @@ export class BlacksmithView implements BlacksmithViewInterface {
             });
             bgGroup.add(imgNode);
 
+            const dimOverlay = new Konva.Rect({
+                x: 0,
+                y: 0,
+                width: width,
+                height: height,
+                fill: '#000000',
+                opacity: 0.25, // so elements on top are more visible
+            });
+            bgGroup.add(dimOverlay);
+
             const layer = this.rootGroup.getLayer();
             if (layer !== null) {
                 layer.batchDraw();
@@ -184,22 +194,34 @@ export class BlacksmithView implements BlacksmithViewInterface {
 
         // Load chalk texture onto the chalkboard rect
         if (typeof window !== 'undefined') {
-         const chalkImg = new window.Image();
-         chalkImg.src = chalkboardTextureUrl;
-         chalkImg.onload = () => {
-             chalkboard.fillPatternImage(chalkImg);
-             chalkboard.fillPatternScale({
-                 x: chalkboard.width() / chalkImg.width,
-                 y: chalkboard.height() / chalkImg.height,
-             });
-             chalkboard.fillPriority('pattern');
+            const chalkImg = new window.Image();
+            chalkImg.src = chalkboardTextureUrl;
+            chalkImg.onload = () => {
+                chalkboard.fillPatternImage(chalkImg);
+                chalkboard.fillPatternScale({
+                    x: chalkboard.width() / chalkImg.width,
+                    y: chalkboard.height() / chalkImg.height,
+                });
+            chalkboard.fillPriority('pattern');
 
-             const layer = this.rootGroup.getLayer();
-             if (layer !== null) {
-                 layer.batchDraw();
-             }
-         };
-     }
+            const layer = this.rootGroup.getLayer();
+            if (layer !== null) {
+                layer.batchDraw();
+            }};
+        }
+
+        // Subtle dark tint over the chalkboard texture
+        const chalkboardTint = new Konva.Rect({
+            x: 184,
+            y: 84,
+            width: 552,
+            height: 232,
+            fill: '#000000',
+            opacity: 0.15,
+            cornerRadius: 4,
+            listening: false,
+        });
+        this.rootGroup.add(chalkboardTint);
 
         this.boardGroup = new Konva.Group({ x: 200, y: 105 });
         this.rootGroup.add(this.boardGroup);
