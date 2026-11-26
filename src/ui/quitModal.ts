@@ -5,12 +5,22 @@ import {
 } from './baseModal';
 
 export interface QuitModalOptions {
-  // Called when the user confirms they want to quit (clicked "Confirm Quit").
-  // Optional because some callers (like the standalone preview) don't need it.
+  /** Custom dialog heading (defaults to 'Quit Game'). */
+  title?: string;
+  /** Custom confirmation body text (defaults to 'Are you sure you want to quit playing?'). */
+  description?: string;
+  /** Custom confirm button label (defaults to 'Confirm Quit'). */
+  confirmLabel?: string;
+  /**
+   * When true, clicking confirm immediately closes the modal and invokes `onConfirm`
+   * (used by the in-game Pause Menu to return to the map without showing the browser farewell screen).
+   */
+  confirmImmediate?: boolean;
+  /** Called when the user confirms they want to quit. */
   onConfirm?: () => void;
-  // Called when the user backs out (Cancel, Escape, backdrop click, etc.).
+  /** Called when the modal is cancelled or dismissed (including returning to the menu). */
   onCancel?: () => void;
-  // If the parent scene dies, this signal fires and auto-closes the modal.
+  /** Optional signal that aborts and closes the modal automatically. */
   signal?: AbortSignal;
 }
 
@@ -47,6 +57,11 @@ export function createQuitModal(
 ): QuitModalController {
   const doc = host.ownerDocument;
 
+  // Use custom dialog copy when provided (e.g., from the in-game pause menu), or fall back to Main Menu defaults
+  const dialogTitle = options.title ?? 'Quit Game';
+  const dialogDescription = options.description ?? 'Are you sure you want to quit playing?';
+  const confirmButtonText = options.confirmLabel ?? 'Confirm Quit';
+
   // `isClosed` prevents cancel() from running twice if multiple dismiss paths fire
   // at the same time (e.g., Escape key + backdrop click in quick succession).
   let isClosed = false;
@@ -56,16 +71,14 @@ export function createQuitModal(
     isClosed = true;
     modal.destroy();
     // If the caller provided an onCancel callback, fire it. If not, just do nothing.
-    if (options.onCancel) {
-      options.onCancel();
-    }
+    options.onCancel?.();
   };
 
   // Hand off all the boilerplate (overlay, focus trap, Escape, backdrop, ARIA)
   // to the shared base modal — we just configure it with our title and hook up cancel.
   const modal = createBaseModal(host, {
-    ariaLabel: 'Quit Game',
-    title: 'Quit Game',
+    ariaLabel: dialogTitle,
+    title: dialogTitle,
     cardClassName: 'cse-quit-card',
     onDismiss: cancel,
     signal: options.signal,
@@ -74,7 +87,7 @@ export function createQuitModal(
   // ---------------------------------------------------------------------------
   // Step 1: Initial Confirmation View
   // ---------------------------------------------------------------------------
-  const desc = createDescription(doc, 'Are you sure you want to quit playing?');
+  const desc = createDescription(doc, dialogDescription);
   modal.body.append(desc);
 
   const cancelBtn = createModalButton(doc, {
@@ -84,25 +97,30 @@ export function createQuitModal(
   });
 
   const confirmBtn = createModalButton(doc, {
-    label: 'Confirm Quit',
+    label: confirmButtonText,
     variant: 'danger',
-    // When the user clicks "Confirm Quit", swap the entire modal content
-    // from the confirmation view to a farewell screen.
     onClick: () => {
-      showFarewellView();
+      handleConfirm();
     },
   });
 
   modal.footer.append(cancelBtn, confirmBtn);
 
   // ---------------------------------------------------------------------------
-  // Step 2: Farewell View Transition
+  // Step 2: Confirm Handler (Immediate Exit or Farewell View Transition)
   // ---------------------------------------------------------------------------
-  function showFarewellView(): void {
-    // Let the caller know the user confirmed (MainMenuScene uses this to play a sound).
-    if (options.onConfirm) {
-      options.onConfirm();
+  // Handler invoked when the user clicks the red confirm action button
+  function handleConfirm(): void {
+    // In-game pause menu mode: close the modal immediately and trigger onConfirm to exit to the map
+    if (options.confirmImmediate) {
+      isClosed = true;
+      modal.destroy();
+      options.onConfirm?.();
+      return;
     }
+
+    // Main menu mode: transition the modal content to the post-quit farewell screen
+    options.onConfirm?.();
 
     // Swap out the header, body, and footer content in-place.
     modal.setTitle('Thanks for Playing!');
