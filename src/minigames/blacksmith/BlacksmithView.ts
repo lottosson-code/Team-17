@@ -1,4 +1,5 @@
 import Konva from 'konva';
+import { settingsStore } from '../../state/settingsStore';
 import {
     Difficulty,
     ForgeEquation,
@@ -14,6 +15,8 @@ import failSoundUrl from './assets/fail.mp3';
 import featherImgUrl from './assets/feather.png';
 import potionImgUrl from './assets/potion.png';
 import ingotImgUrl from './assets/ingot.png';
+import blacksmithBgUrl from './assets/blacksmith-bg.jpg';
+import chalkboardTextureUrl from './assets/chalkboard.jpg';
 
 const ITEM_IMAGES: Record<ItemId, string> = {
     feather: featherImgUrl,
@@ -94,15 +97,46 @@ export class BlacksmithView implements BlacksmithViewInterface {
         this.rootGroup = new Konva.Group({ x: 0, y: 0 });
         layer.add(this.rootGroup);
 
-        // Dark wood background
-        const bg = new Konva.Rect({
+        // Background group (stays behind all UI elements)
+        const bgGroup = new Konva.Group({ x: 0, y: 0 });
+        this.rootGroup.add(bgGroup);
+
+        // Solid fallback while the image loads
+        const bgFallback = new Konva.Rect({
             x: 0,
             y: 0,
             width: width,
             height: height,
             fill: COLOR_BG,
         });
-        this.rootGroup.add(bg);
+        bgGroup.add(bgFallback);
+
+        // Forge background image
+        Konva.Image.fromURL(blacksmithBgUrl, (imgNode) => {
+            imgNode.setAttrs({
+                x: 0,
+                y: 0,
+                width: width,
+                height: height,
+                image: imgNode.image(),
+            });
+            bgGroup.add(imgNode);
+
+            const dimOverlay = new Konva.Rect({
+                x: 0,
+                y: 0,
+                width: width,
+                height: height,
+                fill: '#000000',
+                opacity: 0.25, // so elements on top are more visible
+            });
+            bgGroup.add(dimOverlay);
+
+            const layer = this.rootGroup.getLayer();
+            if (layer !== null) {
+                layer.batchDraw();
+            }
+        });
 
         // Title text
         const title = new Konva.Text({
@@ -115,7 +149,7 @@ export class BlacksmithView implements BlacksmithViewInterface {
             fontStyle: 'bold',
             fill: COLOR_CREAM_TEXT,
             shadowColor: '#000000',
-            shadowBlur: 4,
+            shadowBlur: 3,
             align: 'center',
         });
         this.rootGroup.add(title);
@@ -153,7 +187,7 @@ export class BlacksmithView implements BlacksmithViewInterface {
         const chalkboard = new Konva.Rect({
             x: 180,
             y: 80,
-            width: 520,
+            width: 560,
             height: 240,
             fill: COLOR_CHALKBOARD,
             stroke: COLOR_WOOD_BORDER,
@@ -162,17 +196,62 @@ export class BlacksmithView implements BlacksmithViewInterface {
         });
         this.rootGroup.add(chalkboard);
 
+        // Load chalk texture onto the chalkboard rect
+        if (typeof window !== 'undefined') {
+            const chalkImg = new window.Image();
+            chalkImg.src = chalkboardTextureUrl;
+            chalkImg.onload = () => {
+                chalkboard.fillPatternImage(chalkImg);
+                chalkboard.fillPatternScale({
+                    x: chalkboard.width() / chalkImg.width,
+                    y: chalkboard.height() / chalkImg.height,
+                });
+            chalkboard.fillPriority('pattern');
+
+            const layer = this.rootGroup.getLayer();
+            if (layer !== null) {
+                layer.batchDraw();
+            }};
+        }
+
+        // Subtle dark tint over the chalkboard texture
+        const chalkboardTint = new Konva.Rect({
+            x: 184,
+            y: 84,
+            width: 552,
+            height: 232,
+            fill: '#000000',
+            opacity: 0.15,
+            cornerRadius: 4,
+            listening: false,
+        });
+        this.rootGroup.add(chalkboardTint);
+
         this.boardGroup = new Konva.Group({ x: 200, y: 105 });
         this.rootGroup.add(this.boardGroup);
 
+        // Backing card for player stats display
+        const statsCard = new Konva.Rect({
+            x: 760,
+            y: 110,
+            width: 175,
+            height: 70,
+            fill: 'rgba(24, 20, 18, 0.75)',
+            stroke: COLOR_WOOD_BORDER,
+            strokeWidth: 3,
+            cornerRadius: 6,
+        });
+        this.rootGroup.add(statsCard);
+
         // Simple player stats display
         this.statsText = new Konva.Text({
-            x: 725,
-            y: 120,
-            width: 200,
+            x: 775,
+            y: 124,
+            width: 150,
             text: 'Defense: 0\nMax HP: 100',
             fontFamily: FONT_FAMILY,
             fontSize: 18,
+            lineHeight: 1.3,
             fill: COLOR_CREAM_TEXT,
         });
         this.rootGroup.add(this.statsText);
@@ -199,6 +278,11 @@ export class BlacksmithView implements BlacksmithViewInterface {
             fontFamily: FONT_FAMILY,
             fontSize: 16,
             fill: COLOR_CREAM_TEXT,
+            fontStyle: 'bold',
+            shadowColor: '#000000',
+            shadowBlur: 3,
+            shadowOffset: { x: 2, y: 2 },
+            shadowOpacity: 0.9,
             align: 'center',
         });
         this.rootGroup.add(this.feedbackText);
@@ -296,8 +380,13 @@ export class BlacksmithView implements BlacksmithViewInterface {
         if (typeof Audio === 'undefined') {
             return;
         }
+        const { muted, sfxVolume } = settingsStore.getSettings();
+        if (muted || sfxVolume <= 0) {
+            return;
+        }
         try {
             const sound = new Audio(soundPath);
+            sound.volume = sfxVolume / 100;
             sound.play();
         } catch {
             // Ignore audio errors in tests
@@ -371,6 +460,18 @@ export class BlacksmithView implements BlacksmithViewInterface {
 
         group.add(rect);
         group.add(text);
+
+        group.on('mouseenter', () => {
+            if (typeof document !== 'undefined') {
+                document.body.style.cursor = 'pointer';
+            }
+        });
+        group.on('mouseleave', () => {
+            if (typeof document !== 'undefined') {
+                document.body.style.cursor = 'default';
+            }
+        });
+
         return group;
     }
 
@@ -510,6 +611,9 @@ export class BlacksmithView implements BlacksmithViewInterface {
                 fontFamily: FONT_FAMILY,
                 fontSize: 13,
                 fill: COLOR_CREAM_TEXT,
+                shadowColor: '#000000',
+                shadowBlur: 2,
+                shadowOffset: { x: 2, y: 2 },
                 align: 'center',
             });
             this.answersGroup.add(labelText);
@@ -548,6 +652,16 @@ export class BlacksmithView implements BlacksmithViewInterface {
 
             boxGroup.on('click tap', () => {
                 this.selectInputBox(item.id);
+            });
+            boxGroup.on('mouseenter', () => {
+                if (typeof document !== 'undefined') {
+                    document.body.style.cursor = 'pointer';
+                }
+            });
+            boxGroup.on('mouseleave', () => {
+                if (typeof document !== 'undefined') {
+                    document.body.style.cursor = 'default';
+                }
             });
 
             this.answersGroup.add(boxGroup);
