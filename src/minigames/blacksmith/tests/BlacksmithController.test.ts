@@ -17,6 +17,7 @@ function createMockView(): BlacksmithViewInterface {
         onTypeGuess: vi.fn(),
         onSubmitForge: vi.fn(),
         onBackToMap: vi.fn(),
+        onShowTutorial: vi.fn(),
     };
 }
 
