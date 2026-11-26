@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { makeProblem } from '../combat/problems';
 import type { Enemy, EnemyKind, PowerUpKind } from '../combat/types';
-import { DANGER_START, heartFills, laneDanger, lowHealthLevel, POWER_UP_TEXTURE, statLines } from '../combat/view/hudLogic';
+import { DANGER_START, heartFills, laneDanger, lowHealthLevel, overlayLayout, POWER_UP_TEXTURE, statLines } from '../combat/view/hudLogic';
 const KIND: EnemyKind = { id: 'grunt', maxHp: 10, walkMs: 1000, attackDamage: 1, attackIntervalMs: 500 };
 
 function enemy(id: number, lane: number, progress: number, state: Enemy['state'] = 'walking'): Enemy {
@@ -86,5 +86,45 @@ describe('statLines', () => {
     test('shows 0% and 100% at the extremes', () => {
         expect(statLines({ solved: 0, missed: 4, accuracy: 0 })[2].value).toBe('0%');
         expect(statLines({ solved: 9, missed: 0, accuracy: 1 })[2].value).toBe('100%');
+    });
+});
+
+describe('overlayLayout', () => {
+    // Half-heights of what each row draws: title 54 px text, stats value + label, buttons 58 / 52 px, hint 16 px.
+    const HALF = { title: 30, statsTop: 18, statsBottom: 32 + 10, continue: 29, buttons: 26, hint: 10 };
+
+    const rows = (hasStats: boolean, hasContinue: boolean) => {
+        const l = overlayLayout(hasStats, hasContinue);
+        const spans: [number, number][] = [[l.title - HALF.title, l.title + HALF.title]];
+        if (l.stats !== undefined) spans.push([l.stats - HALF.statsTop, l.stats + HALF.statsBottom]);
+        if (l.continue !== undefined) spans.push([l.continue - HALF.continue, l.continue + HALF.continue]);
+        spans.push([l.buttons - HALF.buttons, l.buttons + HALF.buttons], [l.hint - HALF.hint, l.hint + HALF.hint]);
+        return { l, spans };
+    };
+
+    test.each([
+        ['pause menu', false, false],
+        ['defeat with stats', true, false],
+        ['victory with Continue', false, true],
+        ['victory with stats and Continue', true, true],
+    ])('%s: rows go top to bottom without overlapping, inside the panel', (_name, hasStats, hasContinue) => {
+        const { l, spans } = rows(hasStats, hasContinue);
+        for (let i = 1; i < spans.length; i++) expect(spans[i][0]).toBeGreaterThanOrEqual(spans[i - 1][1]);
+        expect(spans[0][0]).toBeGreaterThan(l.boxY);
+        expect(spans[spans.length - 1][1]).toBeLessThan(l.boxY + l.boxHeight);
+    });
+
+    test('only places a stats row or Continue button when there is one', () => {
+        expect(overlayLayout(false, false).stats).toBeUndefined();
+        expect(overlayLayout(false, false).continue).toBeUndefined();
+        expect(overlayLayout(true, true).stats).toBeDefined();
+        expect(overlayLayout(true, true).continue).toBeDefined();
+    });
+
+    test('keeps the panel above the bottom HUD bar', () => {
+        for (const [s, c] of [[false, false], [true, false], [false, true], [true, true]] as const) {
+            const l = overlayLayout(s, c);
+            expect(l.boxY + l.boxHeight).toBeLessThan(600);
+        }
     });
 });

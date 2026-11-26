@@ -12,7 +12,7 @@ import { EnemyInfoCard, NewEnemyTags } from '../combat/view/NewEnemyTags';
 import { seenEnemiesStore } from '../state/seenEnemiesStore';
 import { createTextures } from '../combat/view/textures';
 import { CURSED_CLASSROOM, DEPTH, ENEMY_PUNCH, enemyArt, enemyPunchTexture, themeTextures, wizardFeet } from '../combat/view/theme';
-import { WizardSprite } from '../combat/view/WizardSprite';
+import { WizardSprite, preloadWizard } from '../combat/view/WizardSprite';
 // [Added] Per-classroom / per-level colours, moon and chalkboard for the battlefield.
 import { classroomTheme } from '../combat/view/classroomThemes';
 import { mapProgressStore } from '../state/mapProgressStore';
@@ -25,6 +25,8 @@ import { soundManager } from '../audio/soundManager';
 import { playCompletedBanner, preloadCompletedBanner } from '../ui/completedBanner';
 // [Added] Shared fade-to-black transition for leaving / restarting the level.
 import { restartSceneWithTransition, startSceneWithTransition } from '../ui/sceneTransition';
+import { randomVariant } from '../audio/soundVariants';
+import { BOSS_VOICE, SPEECH_MUSIC_DUCK, TYPE_MS_PER_CHAR, blipPositions, speechHoldMs, voicePitch } from '../combat/view/speech';
 import '../ui/modal.css';
 import '../ui/game-ui.css';
 
@@ -34,6 +36,25 @@ const MAX_INPUT_LENGTH = 4;
 /** Cap per-frame time so switching tabs doesn't teleport enemies. */
 const MAX_FRAME_MS = 100;
 const THEME = CURSED_CLASSROOM;
+/** Loops for as long as the level lasts; pauses with the game. */
+const COMBAT_MUSIC = 'assets/audio/music/combat-theme.mp3';
+/** Sound effect files, each with a volume relative to the recording (1 = as recorded) to balance them. */
+const SFX = {
+  enemyAttack: { url: 'assets/audio/sfx/enemy-attack.mp3', volume: 1 },
+  /** The wizard's electric spell (zap) hitting an enemy, on every correct answer. */
+  spellHit: { url: 'assets/audio/sfx/electricity-sfx-explosion.wav', volume: 0.7 },
+  /** Battle drums as each wave starts, with the "huge wave" banner. */
+  waveDrums: { url: 'assets/audio/sfx/battle-drums.mp3', volume: 1.4 },
+  /** A submitted answer that matches no enemy. */
+  wrongAnswer: { url: 'assets/audio/sfx/error.mp3', volume: 1.8 },
+  /** The level is won (the music stops first). */
+  victory: { url: 'assets/audio/sfx/victory.mp3', volume: 1.3 },
+  /** The player is defeated, as the wizard falls (the music stops first). */
+  gameOver: { url: 'assets/audio/sfx/game-over.wav', volume: 1 },
+};
+const playEffect = (effect: { url: string; volume: number }) => soundManager.playSound(effect.url, effect.volume);
+/** A key click for each digit typed: keypress-001.wav to keypress-032.wav, picked at random. */
+const KEYPRESS_SOUNDS = Array.from({ length: 32 }, (_, i) => `assets/audio/sfx/keypress/keypress-${String(i + 1).padStart(3, '0')}.wav`);
 const POWER_UP_NAME: Record<PowerUpKind, string> = { freeze: 'Freeze', heal: 'Heal', zap: 'Zap' };
 /** [Added] The boss level that ends each classroom, and how many classrooms there are. */
 const LAST_LEVEL_IN_CLASSROOM = 5;
@@ -65,6 +86,8 @@ export class CombatScene extends Phaser.Scene {
   private canGoToNextClassroom = false;
   /** Animation clock that stops while paused. */
   private animTime = 0;
+  /** The key click played last, so the next one is different. */
+  private lastKeypress: number | undefined;
 
   private pauseMenu: PauseMenuController | null = null;
   private settingsModal: SettingsModalController | null = null;
@@ -99,6 +122,7 @@ export class CombatScene extends Phaser.Scene {
     this.load.font('Poppins', 'assets/fonts/Poppins-Bold.woff', 'woff');
     // [Added] Art for the "COMPLETED" banner.
     preloadCompletedBanner(this);
+    preloadWizard(this);
     for (const art of themeTextures(THEME)) {
       if (!this.textures.exists(art.texture)) this.load.image(art.texture, `assets/combat/enemies/${art.file}.webp`);
       const walk = art.walk;
@@ -228,7 +252,12 @@ export class CombatScene extends Phaser.Scene {
     // [Changed] Removed cameras.main.fadeIn(400, 5, 2, 12): the shared fade-to-black transition
     // (src/ui/fadeTransition.ts) now reveals the level, the same way as every other screen.
 
+    // Restarting the level runs create() again, so the music starts over from the beginning.
+    soundManager.playMusicTrack(COMBAT_MUSIC);
+    [...Object.values(SFX).map((effect) => effect.url), ...KEYPRESS_SOUNDS].forEach((url) => soundManager.preloadSound(url));
+
     this.events.once('shutdown', () => {
+      soundManager.stopMusicTrack();
       this.settingsModal?.destroy();
       this.settingsModal = null;
       this.quitModal?.destroy();
@@ -266,14 +295,14 @@ export class CombatScene extends Phaser.Scene {
   // ---------------------------------------------------------------- input
 
   private onKey(event: KeyboardEvent): void {
-    // Ignore scene hotkeys while a child confirmation or settings modal is open
-    if (this.settingsModal || this.quitModal) return;
-
     // While an enemy's info card is open, keys only close it (so R or M can't restart or leave).
     if (this.enemyInfo) {
       if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') this.closeEnemyInfo();
       return;
     }
+    // Ignore scene hotkeys while a child confirmation or settings modal is open
+    if (this.settingsModal || this.quitModal) return;
+
     const status = this.model.getStatus();
     const isWon = status === 'won' || this.victoryActive;
 
@@ -303,6 +332,7 @@ export class CombatScene extends Phaser.Scene {
 
     if (/^[0-9]$/.test(event.key) && this.typed.length < MAX_INPUT_LENGTH) {
       this.typed += event.key;
+      this.playKeypress();
     } else if (event.key === 'Backspace') {
       this.typed = this.typed.slice(0, -1);
     } else if (event.key === 'Enter') {
@@ -316,6 +346,12 @@ export class CombatScene extends Phaser.Scene {
   private usePowerUp(): void {
     if (this.paused) return;
     this.handleEvents(this.model.usePowerUp());
+  }
+
+  /** A random key click, never the same one twice in a row. */
+  private playKeypress(): void {
+    this.lastKeypress = randomVariant(KEYPRESS_SOUNDS.length, this.lastKeypress);
+    soundManager.playSound(KEYPRESS_SOUNDS[this.lastKeypress]);
   }
 
   private cast(): void {
@@ -340,7 +376,9 @@ export class CombatScene extends Phaser.Scene {
     if (this.paused) return;
     this.paused = true;
     this.tweens.pauseAll();
+    this.wizard.setPaused(true);
     this.time.paused = true;
+    soundManager.pauseMusicTrack();
     soundManager.playSfx('modalOpen');
     if (showMenu) this.pauseMenu?.setVisible(true);
   }
@@ -352,6 +390,8 @@ export class CombatScene extends Phaser.Scene {
     this.enemyInfo?.destroy();
     this.enemyInfo = undefined;
     this.tweens.resumeAll();
+    soundManager.resumeMusicTrack();
+    this.wizard.setPaused(false);
     this.time.paused = false;
   }
 
@@ -375,7 +415,8 @@ export class CombatScene extends Phaser.Scene {
     if (this.paused) {
       this.unpauseGame();
     }
-    soundManager.playSfx('start');
+    soundManager.stopMusicTrack();
+    playEffect(SFX.victory);
     mapProgressStore.completeLevel(this.moduleId, this.levelId);
     this.showVictory();
   }
@@ -451,6 +492,7 @@ export class CombatScene extends Phaser.Scene {
     for (const event of events) {
       switch (event.type) {
         case 'waveStarted':
+          playEffect(SFX.waveDrums);
           this.wavesStarted = event.wave + 1;
           this.hud.showBanner(event.isFinalWave ? 'FINAL WAVE!' : 'A huge wave is approaching!');
           this.battlefield.gust();
@@ -463,12 +505,14 @@ export class CombatScene extends Phaser.Scene {
           this.defeatEnemy(event.enemyId);
           break;
         case 'wrongAnswer':
+          playEffect(SFX.wrongAnswer);
           this.hud.flashInput('wrong');
           this.wizard.scared();
           break;
         case 'playerDamaged': {
           this.pendingPlayerDamage += event.hpLost;
           const impact = () => {
+            playEffect(SFX.enemyAttack);
             this.pendingPlayerDamage -= event.hpLost;
             this.wizard.hurt();
             this.effects.shake(0.007, 160);
@@ -505,6 +549,8 @@ export class CombatScene extends Phaser.Scene {
           this.tweens.add({ targets: this.freezeTint, alpha: 0, duration: 500 });
           break;
         case 'won':
+          soundManager.stopMusicTrack();
+          playEffect(SFX.victory);
           mapProgressStore.completeLevel(this.moduleId, this.levelId);
           this.showVictory();
           break;
@@ -519,11 +565,12 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private castAt(enemyId: number, damage: number): void {
+    playEffect(SFX.spellHit);
     const sprite = this.enemySprites.get(enemyId);
     this.hud.flashInput('correct');
     if (!sprite) return;
     const target = sprite.centre();
-    this.wizard.cast(target);
+    this.wizard.cast();
     this.effects.bolt(this.wizard.tip(), target);
     this.effects.impact(target);
     this.effects.correct(target);
@@ -571,6 +618,9 @@ export class CombatScene extends Phaser.Scene {
   private showDefeatWhenReady(): void {
     if (!this.pendingDefeat || this.pendingPlayerDamage > 0) return;
     this.pendingDefeat = false;
+    // The music stops and the game-over sound plays as the wizard falls, once the last punch lands.
+    soundManager.stopMusicTrack();
+    playEffect(SFX.gameOver);
     this.wizard.defeat();
     this.hud.showOverlay('lost', this.model.getStats());
   }
@@ -686,14 +736,23 @@ export class CombatScene extends Phaser.Scene {
     boss.destroy();
   }
 
-  /** Speech bubble above the boss that follows it, then fades out after holdMs. */
+  /**
+   * Speech bubble above the boss that follows it. The words type out letter by letter with 8-bit
+   * voice blips (like Undertale), then the bubble fades out after holdMs, or once there's been
+   * time to read it.
+   */
   private say(boss: Phaser.GameObjects.Container, text: string, holdMs = 1400): void {
     const label = this.add.text(0, 0, text, {
-      fontFamily: 'Lora', fontSize: '23px', fontStyle: 'bold', color: '#2a1630', align: 'center',
+      fontFamily: 'Lora', fontSize: '23px', fontStyle: 'bold', color: '#2a1630', align: 'left',
       wordWrap: { width: 360 },
-    }).setOrigin(0.5);
+    });
+    // Wrap the whole line first, so the bubble has its final size and words don't jump to the
+    // next line while they type out.
+    const full = label.getWrappedText(text).join('\n');
+    label.setText(full);
     const w = label.width + 36;
     const h = label.height + 24;
+    label.setPosition(-label.width / 2, -label.height / 2).setText('');
     const bubble = this.add.graphics();
     bubble.fillStyle(0x000000, 0.35).fillRoundedRect(-w / 2 + 4, -h / 2 + 5, w, h, 14);
     bubble.fillStyle(0xf6ecd4).fillRoundedRect(-w / 2, -h / 2, w, h, 14);
@@ -703,7 +762,28 @@ export class CombatScene extends Phaser.Scene {
     const speech = this.add.container(-w / 2 - 110, -THEME.boss.height * 0.7, [bubble, label]).setScale(0.4);
     boss.add(speech);
     this.tweens.add({ targets: speech, scale: 1, duration: 200, ease: 'Back.easeOut' });
-    this.tweens.add({ targets: speech, alpha: 0, delay: holdMs, duration: 300, onComplete: () => speech.destroy() });
+    this.tweens.add({ targets: speech, alpha: 0, delay: speechHoldMs(full, holdMs), duration: 300, onComplete: () => speech.destroy() });
+
+    // Game time, so typing (and talking) waits while the game is paused. The music dips while the
+    // boss talks, so its voice is heard.
+    soundManager.duckMusicTrack(SPEECH_MUSIC_DUCK);
+    const blips = new Set(blipPositions(full));
+    let shown = 0;
+    let step: number | undefined;
+    this.time.addEvent({
+      delay: TYPE_MS_PER_CHAR,
+      repeat: full.length - 1,
+      callback: () => {
+        if (!label.active) return;
+        shown++;
+        label.setText(full.slice(0, shown));
+        if (blips.has(shown - 1)) {
+          step = randomVariant(BOSS_VOICE.steps.length, step);
+          soundManager.playVoiceBlip(voicePitch(BOSS_VOICE, step));
+        }
+        if (shown === full.length) this.time.delayedCall(250, () => soundManager.duckMusicTrack(1));
+      },
+    });
   }
 
   private wait(ms: number): Promise<void> {

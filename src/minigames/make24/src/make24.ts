@@ -268,6 +268,10 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
     const button = clickedButton(event.target);
     if (button === null) return;
 
+    // While the how-to-play card is open, only its own buttons work. Tab can still
+    // reach the buttons behind it, and pressing Enter on one would act on the game.
+    if (view.isTutorialShown && !view.isInsideTutorial(button)) return;
+
     const { card, op, difficulty, action } = button.dataset;
     if (card !== undefined) handleMove(model.pickCard(Number(card)));
     else if (op !== undefined) handleMove(model.pickOperation(op as Op));
@@ -318,8 +322,8 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
 
     let handled: boolean;
     if (view.isTutorialShown) handled = handleTutorialKey(event.key);
-    else if (view.isWinScreenShown) handled = handleWinScreenKey(event.key);
-    else handled = handleGameKey(event.key);
+    else if (view.isWinScreenShown) handled = handleWinScreenKey(event.key, event.repeat);
+    else handled = handleGameKey(event.key, event.repeat);
 
     if (handled) event.preventDefault();
   }
@@ -332,9 +336,11 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
   }
 
   /** Returns true if the key did something. */
-  function handleWinScreenKey(key: string): boolean {
+  function handleWinScreenKey(key: string, isRepeat: boolean): boolean {
     if (key === 'n' || key === 'N') {
-      skipPuzzle();
+      // Holding the key fires repeats. Without this check the repeats would reach
+      // the next puzzle and skip it, which breaks the streak.
+      if (!isRepeat) skipPuzzle();
       return true;
     }
     if (key === 'Escape' && options.onExit) {
@@ -345,7 +351,7 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
   }
 
   /** Returns true if the key did something. */
-  function handleGameKey(key: string): boolean {
+  function handleGameKey(key: string, isRepeat: boolean): boolean {
     if (/^[1-4]$/.test(key)) {
       pickCardInSlot(Number(key) - 1);
       return true;
@@ -359,8 +365,10 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
 
     if (key === 'Backspace' || key === 'u' || key === 'U') undo();
     else if (key === 'r' || key === 'R') reset();
-    else if (key === 'n' || key === 'N') skipPuzzle();
-    else if (key === 'h' || key === 'H') showHint();
+    else if (key === 'n' || key === 'N') {
+      // A held key repeats; only the first press should skip the puzzle.
+      if (!isRepeat) skipPuzzle();
+    } else if (key === 'h' || key === 'H') showHint();
     else if (key === '?') openTutorial();
     else if (key === 'Escape') clearSelection();
     else return false;

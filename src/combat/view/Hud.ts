@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import type { CombatStats } from '../types';
-import { heartFills, POWER_UP_TEXTURE, statLines } from './hudLogic';
+import { heartFills, overlayLayout, POWER_UP_TEXTURE, statLines } from './hudLogic';
 import { DEPTH } from './theme';
 import { TEX } from './textures';
+import { WIZARD_FACE, WIZARD_SHEET } from './wizardArt';
 import type { PowerUpKind } from '../types';
 
 // The combat HUD: player portrait and hearts, level banner with wave progress, pause button,
@@ -87,7 +88,8 @@ export class Hud {
         const portrait = add.graphics();
         hud(portrait);
         portrait.fillStyle(0x1b1430).fillCircle(66, 60, 48);
-        const face = add.image(66, 116, 'wizard-body').setScale(0.82);
+        const face = add.image(66, 60, WIZARD_SHEET.texture, WIZARD_FACE.frame)
+            .setOrigin(WIZARD_FACE.x / WIZARD_SHEET.frameWidth, WIZARD_FACE.y / WIZARD_SHEET.frameHeight).setScale(0.62);
         hud(face);
         const faceMask = scene.make.graphics({}, false).fillStyle(0xffffff).fillCircle(66, 60, 44);
         face.setMask(faceMask.createGeometryMask());
@@ -299,35 +301,30 @@ export class Hud {
         if (!kind) return;
 
         const add = this.scene.add;
+        // The victory screen gets a prominent "Continue" button; the panel grows to fit it and the stats row.
+        const hasContinue = kind === 'won' && Boolean(this.callbacks.onContinue);
+        const layout = overlayLayout(Boolean(stats), hasContinue);
+
         // Full-screen translucent dark backdrop that blocks clicks to the battlefield below
         const dim = add.rectangle(640, 360, 1280, 720, 0x05020c, 0.6).setInteractive();
         // [Added] Next Classroom only makes sense on a win with a classroom after this one.
         const showNext = kind === 'won' && options.nextClassroom === true && this.callbacks.onNextClassroom !== undefined;
         const box = add.graphics();
-
-        // Check whether we should show the prominent "Continue" button row on the victory screen
-        const hasContinue = kind === 'won' && Boolean(this.callbacks.onContinue);
-
-        // Use a taller panel when the victory screen includes the top Continue button row
-        const boxY = hasContinue ? (stats ? 165 : 185) : 210;
-        const boxHeight = hasContinue ? (stats ? 415 : 350) : 300;
-        bannerShape(box, 640, boxY, showNext ? 680 : 560, boxHeight);
+        // [Added] The panel widens to fit a third button when Next Classroom is shown.
+        bannerShape(box, 640, layout.boxY, showNext ? 680 : 560, layout.boxHeight);
 
         const titles = { paused: 'PAUSED', won: 'VICTORY!', lost: 'DEFEATED' };
         const colors = { paused: '#f3e6c4', won: '#ffd76a', lost: '#ff6b7a' };
-        const titleY = hasContinue ? (stats ? 225 : 248) : (stats ? 268 : 290);
-        const title = add.text(640, titleY, titles[kind], {
+        const title = add.text(640, layout.title, titles[kind], {
             fontFamily: 'Lora', fontSize: '54px', fontStyle: 'bold', color: colors[kind], stroke: '#140818', strokeThickness: 8,
         }).setOrigin(0.5);
 
         const items: Phaser.GameObjects.GameObject[] = [dim, box, title];
-        if (stats) items.push(...this.statColumns(stats, hasContinue ? 294 : 336));
+        if (stats && layout.stats !== undefined) items.push(...this.statColumns(stats, layout.stats));
 
         // On victory, place a prominent wide "Continue" button centered above the secondary row
-        if (hasContinue) {
-            items.push(
-                menuButton(this.scene, 640, stats ? 393 : 336, 'Continue  ▶', () => this.callbacks.onContinue?.(), true)
-            );
+        if (hasContinue && layout.continue !== undefined) {
+            items.push(menuButton(this.scene, 640, layout.continue, 'Continue  ▶', () => this.callbacks.onContinue?.(), true));
         }
 
         // Secondary action row: Play Again & Back to Map (or Resume / Restart / Back to Map when paused)
@@ -337,16 +334,15 @@ export class Hud {
         // [Added] Third button on the level 5 victory panel: go on to the next classroom.
         if (showNext) buttons.push(['Next Classroom', () => this.callbacks.onNextClassroom?.()]);
         const spacing = showNext ? 205 : 190;
+        // Compute the horizontal X position of the first button so the row is centered at X = 640
         const first = 640 - ((buttons.length - 1) * spacing) / 2;
-        const rowY = hasContinue ? (stats ? 470 : 416) : (stats ? 428 : 410);
-        buttons.forEach(([label, action], i) => items.push(menuButton(this.scene, first + i * spacing, rowY, label, action)));
+        buttons.forEach(([label, action], i) => items.push(menuButton(this.scene, first + i * spacing, layout.buttons, label, action)));
 
         const shortcuts = ['R to restart', 'M for map'];
         if (hasContinue) shortcuts.unshift('Enter / C to continue');
         if (showNext) shortcuts.push('N for next classroom');
         const hint = kind === 'paused' ? 'Esc to resume' : shortcuts.join('  ·  ');
-        const hintY = hasContinue ? (stats ? 536 : 484) : (stats ? 484 : 470);
-        items.push(add.text(640, hintY, hint, { fontFamily: 'Lora', fontSize: '16px', color: '#a99ccc' }).setOrigin(0.5));
+        items.push(add.text(640, layout.hint, hint, { fontFamily: 'Lora', fontSize: '16px', color: '#a99ccc' }).setOrigin(0.5));
 
         this.overlay = add.container(0, 0, items).setDepth(DEPTH.overlay).setAlpha(1);
     }

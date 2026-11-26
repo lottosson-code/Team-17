@@ -41,3 +41,22 @@ export function lowHealthLevel(hp: number, maxHp: number): number {
     const fraction = hp / maxHp;
     return fraction >= 0.4 ? 0 : 1 - fraction / 0.4;
 }
+
+/** Vertical positions (centres, except boxY = top) on the pause / end-of-level panel. */
+export interface OverlayLayout {
+    boxY: number;
+    boxHeight: number;
+    title: number;
+    stats?: number; // The stats row's values; their labels sit 32 px below
+    continue?: number;
+    buttons: number;
+    hint: number;
+}
+
+/** The panel grows to fit an end screen's stats row and the victory screen's Continue button. */
+export function overlayLayout(hasStats: boolean, hasContinue: boolean): OverlayLayout {
+    if (hasStats && hasContinue) return { boxY: 150, boxHeight: 400, title: 212, stats: 280, continue: 374, buttons: 448, hint: 512 };
+    if (hasContinue) return { boxY: 185, boxHeight: 350, title: 248, continue: 336, buttons: 416, hint: 484 };
+    if (hasStats) return { boxY: 210, boxHeight: 300, title: 268, stats: 336, buttons: 428, hint: 484 };
+    return { boxY: 210, boxHeight: 300, title: 290, buttons: 410, hint: 470 };
+}

@@ -459,6 +459,22 @@ describe('how-to-play tutorial', () => {
     find<HTMLButtonElement>('[data-action="close-tutorial"]').click();
     expect(tutorial().hidden).toBe(true); // closing works even though saving failed
   });
+
+  it('ignores buttons behind the card while it is open (e.g. reached with Tab)', () => {
+    const onSkip = vi.fn();
+    mountWithTutorial({ numbers: [4, 7, 8, 9], tutorial: 'always', onSkip });
+
+    // Pressing Enter on a focused button behind the card produces a click like this one.
+    find<HTMLButtonElement>('[data-action="skip"]').click();
+    expect(onSkip).not.toHaveBeenCalled();
+    expect(shownValues()).toEqual(['4', '7', '8', '9']);
+    expect(tutorial().hidden).toBe(false);
+
+    // Once the card is closed, the same button works again.
+    find<HTMLButtonElement>('[data-action="close-tutorial"]').click();
+    find<HTMLButtonElement>('[data-action="skip"]').click();
+    expect(onSkip).toHaveBeenCalledWith([4, 7, 8, 9]);
+  });
 });
 
 describe('hints', () => {
@@ -540,5 +556,54 @@ describe('hints', () => {
     expect(result.coinsEarned).toBe(10);
     vi.advanceTimersByTime(700);
     expect(find('.cse-make24__result-meta').textContent).not.toContain('hint');
+  });
+});
+
+describe('keyboard shortcuts', () => {
+  /** Sends a key press to the page, like a real keyboard would. */
+  function press(key: string, repeat = false) {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key, repeat, bubbles: true }));
+  }
+
+  /** jsdom has no layout, so tell the game it is on screen. */
+  function mountWithKeyboard(options: Make24Options) {
+    game = mountMake24(container, { tutorial: 'never', ...options });
+    vi.spyOn(game.element, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
+    return game;
+  }
+
+  it('does not skip the next puzzle when N is held down on the win screen', () => {
+    const onSkip = vi.fn();
+    mountWithKeyboard({ numbers: [6, 6, 6, 6], onSkip });
+
+    solveSixes();
+    vi.advanceTimersByTime(700); // the win screen appears
+    expect(overlay().hidden).toBe(false);
+
+    press('n'); // first press: next puzzle
+    press('n', true); // holding the key: repeats must be ignored
+
+    expect(onSkip).not.toHaveBeenCalled();
+    expect(stat('streak')).toBe('1');
+    expect(overlay().hidden).toBe(true);
+  });
+
+  it('still skips an unsolved puzzle on a normal N press', () => {
+    const onSkip = vi.fn();
+    mountWithKeyboard({ numbers: [4, 7, 8, 9], onSkip });
+
+    press('n');
+    expect(onSkip).toHaveBeenCalledWith([4, 7, 8, 9]);
+  });
+
+  it('does not leave an operation chosen when only one card is left', () => {
+    mountWithKeyboard({ numbers: [1, 2, 3, 4] });
+    combine(0, '+', 1);
+    combine(1, '+', 2);
+    combine(2, '+', 3); // 10 is the only card left
+
+    press('4'); // select the last card
+    press('+'); // there is nothing to combine it with
+    expect(find('[data-op="+"]').getAttribute('aria-pressed')).toBe('false');
   });
 });
