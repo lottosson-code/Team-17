@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { heartFills, POWER_UP_TEXTURE } from './hudLogic';
+import type { CombatStats } from '../types';
+import { heartFills, POWER_UP_TEXTURE, statLines } from './hudLogic';
 import { DEPTH } from './theme';
 import { TEX } from './textures';
 import type { PowerUpKind } from '../types';
@@ -280,8 +281,11 @@ export class Hud {
         this.scene.tweens.add({ targets: this.banner, alpha: 0, delay: holdMs, duration: 400 });
     }
 
-    /** Pause menu or end-of-level panel, with buttons. Pass undefined to close it. */
-    showOverlay(kind: 'paused' | 'won' | 'lost' | undefined): void {
+    /**
+     * Pause menu or end-of-level panel, with buttons. Pass undefined to close it.
+     * With `stats`, the panel also shows the level's statistics between the title and the buttons.
+     */
+    showOverlay(kind: 'paused' | 'won' | 'lost' | undefined, stats?: CombatStats): void {
         this.overlay?.destroy();
         this.overlay = undefined;
         if (!kind) return;
@@ -295,23 +299,24 @@ export class Hud {
         const hasContinue = kind === 'won' && Boolean(this.callbacks.onContinue);
 
         // Use a taller panel when the victory screen includes the top Continue button row
-        const boxY = hasContinue ? 185 : 210;
-        const boxHeight = hasContinue ? 350 : 300;
+        const boxY = hasContinue ? (stats ? 165 : 185) : 210;
+        const boxHeight = hasContinue ? (stats ? 415 : 350) : 300;
         bannerShape(box, 640, boxY, 560, boxHeight);
 
         const titles = { paused: 'PAUSED', won: 'VICTORY!', lost: 'DEFEATED' };
         const colors = { paused: '#f3e6c4', won: '#ffd76a', lost: '#ff6b7a' };
-        const titleY = hasContinue ? 248 : 290;
+        const titleY = hasContinue ? (stats ? 225 : 248) : (stats ? 268 : 290);
         const title = add.text(640, titleY, titles[kind], {
             fontFamily: 'Lora', fontSize: '54px', fontStyle: 'bold', color: colors[kind], stroke: '#140818', strokeThickness: 8,
         }).setOrigin(0.5);
 
         const items: Phaser.GameObjects.GameObject[] = [dim, box, title];
+        if (stats) items.push(...this.statColumns(stats, hasContinue ? 294 : 336));
 
         // On victory, place a prominent wide "Continue" button centered above the secondary row
         if (hasContinue) {
             items.push(
-                menuButton(this.scene, 640, 336, 'Continue  ▶', () => this.callbacks.onContinue?.(), true)
+                menuButton(this.scene, 640, stats ? 393 : 336, 'Continue  ▶', () => this.callbacks.onContinue?.(), true)
             );
         }
 
@@ -323,7 +328,7 @@ export class Hud {
         const spacing = 190;
         // Compute the horizontal X position of the first button so the row is centered at X = 640
         const first = 640 - ((buttons.length - 1) * spacing) / 2;
-        const rowY = hasContinue ? 416 : 410;
+        const rowY = hasContinue ? (stats ? 470 : 416) : (stats ? 428 : 410);
         buttons.forEach(([label, action], i) => items.push(menuButton(this.scene, first + i * spacing, rowY, label, action)));
 
         const hint = kind === 'paused'
@@ -331,10 +336,25 @@ export class Hud {
             : hasContinue
                 ? 'Enter / C to continue  ·  R to restart  ·  M for map'
                 : 'R to restart  ·  M for map';
-        const hintY = hasContinue ? 484 : 470;
+        const hintY = hasContinue ? (stats ? 536 : 484) : (stats ? 484 : 470);
         items.push(add.text(640, hintY, hint, { fontFamily: 'Lora', fontSize: '16px', color: '#a99ccc' }).setOrigin(0.5));
 
         this.overlay = add.container(0, 0, items).setDepth(DEPTH.overlay).setAlpha(1);
+    }
+
+    /** The end screen's statistics: a row of columns, each a large value over a small label. */
+    private statColumns(stats: CombatStats, y: number): Phaser.GameObjects.Text[] {
+        const lines = statLines(stats);
+        const spacing = 150;
+        const first = 640 - ((lines.length - 1) * spacing) / 2;
+        return lines.flatMap(({ label, value }, i) => [
+            this.scene.add.text(first + i * spacing, y, value, {
+                fontFamily: 'Poppins', fontSize: '30px', color: CREAM,
+            }).setOrigin(0.5),
+            this.scene.add.text(first + i * spacing, y + 32, label.toUpperCase(), {
+                fontFamily: 'Lora', fontSize: '14px', fontStyle: 'bold', color: '#a99ccc',
+            }).setOrigin(0.5),
+        ]);
     }
 
     private drawInputFrame(): void {
@@ -363,7 +383,7 @@ export class Hud {
 }
 
 /** Dark panel with a light border and corner diamonds, centred on cx. */
-function bannerShape(g: Phaser.GameObjects.Graphics, cx: number, y: number, w: number, h: number): void {
+export function bannerShape(g: Phaser.GameObjects.Graphics, cx: number, y: number, w: number, h: number): void {
     const x = cx - w / 2;
     g.fillStyle(0x000000, 0.4).fillRoundedRect(x + 4, y + 6, w, h, 14);
     g.fillGradientStyle(0x1f1a3d, 0x1f1a3d, 0x100c22, 0x100c22, 0.96).fillRoundedRect(x, y, w, h, 14);
@@ -400,7 +420,7 @@ function pressable(target: Phaser.GameObjects.Container, action: () => void): vo
  * Creates an interactive Phaser overlay button.
  * When `prominent` is true, renders a wider, taller gold-bordered call-to-action button (used for "Continue").
  */
-function menuButton(
+export function menuButton(
     scene: Phaser.Scene,
     x: number,
     y: number,
