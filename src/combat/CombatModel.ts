@@ -444,8 +444,9 @@ export class CombatModel {
 
     private attack(enemy: Enemy, events: CombatEvent[]): void {
         const damage = enemy.kind.attackDamage;
-        this.playerHp = Math.max(0, this.playerHp - damage);
-        events.push({ type: 'playerDamaged', enemyId: enemy.id, damage });
+        const hpLost = Math.min(this.playerHp, damage);
+        this.playerHp -= hpLost;
+        events.push({ type: 'playerDamaged', enemyId: enemy.id, damage, hpLost });
         if (this.playerHp === 0) {
             this.status = 'lost';
             events.push({ type: 'lost' });

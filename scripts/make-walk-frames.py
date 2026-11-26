@@ -1,17 +1,15 @@
-"""Make a 4-frame walk cycle for an enemy from its still drawing.
+"""Make a 24-frame walk cycle for an enemy from its still drawing.
 
-The drawn legs are erased and two new rubber-hose legs with boots are drawn and animated
-(heel strike, flat foot, heel lift, swing), and the body bobs. Each leg goes straight down into
-the heel of its shoe; every cycle faces left, towards the wizard.
+Two rubber-hose legs with boots replace the drawn legs. The gait uses low foot clearance
+and a small body bob, and every cycle faces left, towards the wizard.
 
 Usage:
-    python scripts/make-walk-frames.py OUTPUT_DIR [NAME ...] [--preview]
+    python scripts/make-walk-frames.py OUTPUT_DIR [NAME ...] [--preview] [--game]
 
-NAME is a key of CONFIG (default: all). Writes OUTPUT_DIR/<name>-walk-sheet.png (4 frames in a
-row, transparent), and with --preview also <name>-walk.gif on the floor colour. Then make the
-game file with the usual spritesheet script, e.g.:
-    python scripts/make-spritesheet.py OUT/pencil-walk-sheet.png public/assets/combat/enemies/pencil-walk.webp --cols 4 --rows 1 --keep-background
-and use the printed frame size in theme.ts (EnemyArt.walk).
+NAME is a key of CONFIG (default: all). Writes OUTPUT_DIR/<name>-walk-sheet.png, or with
+--game writes <name>-walk.webp for Phaser using the registered frame size in theme.ts.
+It also prints the full-cycle distance in frame pixels for the matching stride in theme.ts.
+Add --preview to also write a looping GIF on the floor colour.
 
 All coordinates in CONFIG are pixels of public/assets/combat/enemies/<file>.webp (the still art).
 Requires Pillow and numpy.
@@ -24,8 +22,10 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 ENEMIES = Path(__file__).resolve().parent.parent / 'public/assets/combat/enemies'
-FRAMES = 4  # Contact, passing, contact, passing
-PREVIEW_FPS = 6
+FRAMES = 24
+GAME_COLUMNS = 12
+GAME_FRAME_HEIGHT = 300
+PREVIEW_FPS = 30
 SS = 4  # Supersampling for smooth outlines
 
 OUTLINE = (22, 11, 6, 255)
@@ -37,41 +37,55 @@ BOOT_FAR = (44, 29, 21, 255)
 BOOT_SHINE = (150, 96, 58, 255)
 
 CONFIG = {
+    'red-book': dict(
+        file='red-book', source='red-book-walk-source.png', facing=-1,
+        erase=[(0, 213), (60, 201), (94, 209), (118, 214), (148, 225), (184, 237),
+               (203, 235), (229, 227), (266, 216), (266, 306), (0, 306)],
+        hips=[(118, 210), (164, 225)],
+        ground=296, stride=86, lift=9,
+        width=15, boot=(66, 34), bob=3, canvas=(266, 306), offset=(0, 0),
+        game_box=(0, 0, 266, 300),
+    ),
     'pencil': dict(
         file='pencil',
         # Keep everything except this polygon (the old leg and boot).
         erase=[(127, 226), (232, 226), (232, 330), (64, 330), (100, 268)],
         hips=[(110, 246), (64, 250)],  # near (front) hip, far hip
-        ground=362, stride=46, lift=22,
-        width=13, boot=(56, 34), bob=5, canvas=(270, 374), offset=(14, 6),
+        ground=350, stride=55, lift=8,
+        width=13, boot=(56, 34), bob=2, canvas=(270, 374), offset=(14, 6),
+        game_box=(26, 1, 256, 365),
     ),
     'eraser': dict(
         file='eraser', facing=-1,
         erase=[(0, 225), (62, 226), (100, 249), (150, 266), (172, 272), (192, 261), (206, 249), (214, 246), (287, 246), (287, 320), (0, 320)],
         hips=[(176, 258), (90, 250)],
-        ground=322, stride=34, lift=11,
-        width=12, boot=(58, 27), bob=4, canvas=(300, 330), offset=(6, 4),
+        ground=316, stride=39, lift=5,
+        width=12, boot=(58, 27), bob=1.5, canvas=(300, 330), offset=(6, 4),
+        game_box=(7, 0, 294, 325),
     ),
     'eraser-baby': dict(
         file='eraser-baby', facing=-1,
         erase=[(0, 236), (72, 236), (120, 253), (160, 262), (196, 270), (222, 256), (245, 238), (262, 244), (334, 244), (334, 320), (0, 320)],
-        hips=[(212, 262), (98, 248)],
-        ground=322, stride=32, lift=10,
-        width=12, boot=(62, 28), bob=4, canvas=(346, 330), offset=(6, 4),
+        hips=[(198, 260), (136, 252)], ankle_shift=-4,
+        ground=315, stride=37, lift=4,
+        width=12, boot=(62, 28), bob=1.5, canvas=(346, 330), offset=(6, 4),
+        game_box=(6, 0, 340, 325),
     ),
     'eraser-boss': dict(
         file='eraser-boss', facing=-1,
         erase=[(0, 288), (62, 286), (100, 300), (150, 315), (176, 304), (190, 293), (270, 293), (270, 360), (0, 360)],
         hips=[(166, 306), (80, 292)],
-        ground=362, stride=32, lift=10,
-        width=12, boot=(62, 28), bob=4, canvas=(282, 370), offset=(6, 4),
+        ground=355, stride=36, lift=5,
+        width=12, boot=(62, 28), bob=1.5, canvas=(282, 370), offset=(6, 4),
+        game_box=(6, 0, 276, 365),
     ),
     'pencil-sharpener': dict(
         file='pencil-sharpener',
         erase=[(0, 258), (60, 258), (70, 252), (220, 251), (230, 246), (290, 246), (290, 320), (0, 320)],
         hips=[(205, 250), (100, 250)],
-        ground=322, stride=34, lift=11,
-        width=15, boot=(70, 32), bob=3, canvas=(302, 330), offset=(6, 4),
+        ground=314, stride=40, lift=5,
+        width=15, boot=(70, 32), bob=1.5, canvas=(302, 330), offset=(6, 4),
+        game_box=(6, 1, 296, 325),
     ),
 }
 
@@ -79,7 +93,10 @@ CONFIG = {
 # The three erasers made from one drawing (scripts/make-eraser-variants.py) share the same legs.
 for _variant in ('eraser-big', 'eraser-giant'):
     CONFIG[_variant] = {**CONFIG['eraser'], 'file': _variant}
-CONFIG['eraser-big']['canvas'] = (313, 330)  # This one's headband tail makes the art wider
+# The large eraser's headband tail makes its canvas and game frame wider.
+CONFIG['eraser-big'].update(canvas=(313, 330), game_box=(7, 0, 307, 325))
+# Centre the pink eraser's gait under the lower face of its tilted body.
+CONFIG['eraser'].update(hips=[(172, 260), (132, 252)], ankle_shift=-4)
 
 
 def ik_knee(hip, foot, thigh, shin, bend):
@@ -210,23 +227,15 @@ def draw_leg(img, hip, ankle, boot, cfg, far):
 
 def foot_pose(t, cfg, base_x):
     """Ankle x, height of the ankle above the ground, and foot angle (deg, + = toe down)
-    at cycle time t in [0, 1). Stance (first half): heel strikes, foot flat, heel lifts at the end.
-    Swing (second half): toe pushes off, the foot travels forward in an arc, toe up to land."""
-    A = cfg['stride'] / 2
+    at cycle time t in [0, 1). The planted sole stays flat and travels back linearly by one step.
+    The swinging foot returns in a low arc and meets the ground flat at both ends."""
+    step = cfg['stride']
     if t < 0.5:
-        u = t / 0.5
-        x = base_x + A - 2 * A * u
-        if u < 0.15:
-            angle = -14 * (1 - u / 0.15)  # Heel strike: toe still up
-        elif u > 0.75:
-            angle = 16 * (u - 0.75) / 0.25  # Heel lifts, rolling onto the toe
-        else:
-            angle = 0.0
-        return x, 0.0, angle, True
+        return base_x + step * (0.5 - 2 * t), 0.0, 0.0, True
     u = (t - 0.5) / 0.5
-    x = base_x - A + 2 * A * (0.5 - 0.5 * math.cos(math.pi * u))
+    x = base_x - (step / 2) * math.cos(math.pi * u)
     lift = cfg['lift'] * math.sin(math.pi * u)
-    angle = 16 * (1 - u) - 14 * u  # Toe down after push-off -> toe up before landing
+    angle = 5 * math.sin(2 * math.pi * u)
     return x, lift, angle, False
 
 
@@ -246,7 +255,9 @@ def boot_at(ankle_x, lift, angle, stance, cfg):
 
 def make_frames(name, n):
     cfg = CONFIG[name]
-    src = Image.open(ENEMIES / f"{cfg['file']}.webp").convert('RGBA')
+    source = Path(__file__).resolve().parent / 'art' / cfg['source'] if 'source' in cfg else ENEMIES / f"{cfg['file']}.webp"
+    with Image.open(source) as image:
+        src = image.convert('RGBA')
     # Left-facing art is mirrored so the rig always walks right, then mirrored back at the end.
     flip = cfg.get('facing', 1) < 0
     sw = src.width
@@ -260,14 +271,25 @@ def make_frames(name, n):
     ImageDraw.Draw(mask).polygon(erase, fill=0)
     body = src.copy()
     body.putalpha(Image.fromarray(np.minimum(np.asarray(src.getchannel('A')), np.asarray(mask))))
-    # Leg bones: together 15 % longer than hip-to-ankle, so the knees bend a little but never zigzag.
+    # Keep the leg only slightly longer than hip-to-ankle for a shallow knee bend.
     bw, bh = cfg['boot']
     rest = max(y for part in boot_parts(bw, bh) for _, y in part)
     hip_y = sum(y for _, y in hips) / len(hips) + cfg['offset'][1]
-    cfg = {**cfg, 'thigh': (cfg['ground'] - rest - hip_y) * cfg.get('bend', 1.15) / 2}
+    cfg = {**cfg, 'thigh': (cfg['ground'] - rest - hip_y) * 1.045 / 2}
     cfg['shin'] = cfg['thigh']
     W, H = cfg['canvas']
     ox, oy = cfg['offset']
+    (nhx, nhy), (fhx, fhy) = hips
+    centre_x = (nhx + fhx) / 2 + ox
+    direction = math.copysign(1, nhx - fhx)
+    # Keep both ankles close to a shared centreline so the contact foot can alternate.
+    # Bring wide hip anchors in too, so short legs don't have to bend sharply inward.
+    hip_spacing = direction * min(abs(nhx - fhx), cfg['stride'] * 0.95)
+    ankle_spacing = direction * cfg['stride'] * 0.12
+    ankle_centre = centre_x + cfg.get('ankle_shift', 4)
+    near_base = ankle_centre + ankle_spacing / 2
+    far_base = ankle_centre - ankle_spacing / 2
+
     frames = []
     for i in range(n):
         t = i / n
@@ -275,11 +297,11 @@ def make_frames(name, n):
         bob = -cfg['bob'] * abs(math.sin(2 * math.pi * t))
         layer_back = Image.new('RGBA', (W * SS, H * SS))
         layer_front = Image.new('RGBA', (W * SS, H * SS))
-        (nhx, nhy), (fhx, fhy) = hips
-        near_hip = (nhx + ox, nhy + oy + bob)
-        far_hip = (fhx + ox, fhy + oy + bob)
-        for hip, phase, layer, far in ((far_hip, 0.5, layer_back, True), (near_hip, 0.0, layer_front, False)):
-            ax, lift, angle, stance = foot_pose((t + phase) % 1, cfg, hip[0] + cfg.get('foot_dx', 4))
+        near_hip = (centre_x + hip_spacing / 2, nhy + oy + bob)
+        far_hip = (centre_x - hip_spacing / 2, fhy + oy + bob)
+        legs = ((far_hip, far_base, 0.5, layer_back, True), (near_hip, near_base, 0.0, layer_front, False))
+        for hip, base, phase, layer, far in legs:
+            ax, lift, angle, stance = foot_pose((t + phase) % 1, cfg, base)
             ankle, boot = boot_at(ax, lift, angle, stance, cfg)
             draw_leg(layer, hip, ankle, boot, cfg, far)
         frame = layer_back.resize((W, H), Image.LANCZOS)
@@ -290,17 +312,38 @@ def make_frames(name, n):
     return frames
 
 
-def save(name, out_dir, preview):
-    """Writes the frame sheet (and optionally a preview GIF) for one enemy."""
+def save(name, out_dir, preview, game):
+    """Write a raw or registered game sheet, and optionally a preview GIF."""
     out_dir.mkdir(parents=True, exist_ok=True)
     frames = make_frames(name, FRAMES)
     W, H = frames[0].size
-    sheet = Image.new('RGBA', (W * FRAMES, H))
-    for i, f in enumerate(frames):
-        sheet.alpha_composite(f, (i * W, 0))
-    sheet.save(out_dir / f'{name}-walk-sheet.png')
+    w, h = W, H
+    columns = FRAMES
+    cycle_distance = 2 * CONFIG[name]['stride']
+    sheet_frames = frames
+    if game:
+        # Keep the original frame size and horizontal registration. Align all poses to a
+        # shared sole baseline so shorter legs don't shift the lane position or float.
+        left, top, right, bottom = CONFIG[name]['game_box']
+        registered_height = bottom - top
+        sole = max(frame.getchannel('A').point(lambda v: 255 if v > 8 else 0).getbbox()[3]
+                   for frame in frames)
+        box = (left, sole - registered_height, right, sole)
+        h = GAME_FRAME_HEIGHT
+        w = round((right - left) * h / registered_height)
+        cycle_distance *= w / (right - left)
+        columns = GAME_COLUMNS
+        sheet_frames = [frame.crop(box).resize((w, h), Image.Resampling.LANCZOS) for frame in frames]
+    sheet = Image.new('RGBA', (w * columns, h * math.ceil(FRAMES / columns)))
+    for i, frame in enumerate(sheet_frames):
+        row, column = divmod(i, columns)
+        sheet.alpha_composite(frame, (column * w, row * h))
+    if game:
+        sheet.save(out_dir / f'{name}-walk.webp', quality=88, method=6)
+    else:
+        sheet.save(out_dir / f'{name}-walk-sheet.png')
     if preview:
-        ground = CONFIG[name]['ground'] + CONFIG[name]['offset'][1] + 1
+        ground = CONFIG[name]['ground'] + 2
         gif = []
         for f in frames:
             b = Image.new('RGBA', f.size, (58, 50, 74, 255))
@@ -309,7 +352,7 @@ def save(name, out_dir, preview):
             gif.append(b.convert('RGB'))
         gif[0].save(out_dir / f'{name}-walk.gif', save_all=True, append_images=gif[1:],
                     duration=int(1000 / PREVIEW_FPS), loop=0)
-    print(f'{name}: {FRAMES} frames of {W}x{H}, stride {CONFIG[name]["stride"]} px per step (art pixels)')
+    print(f'{name}: {FRAMES} frames of {w}x{h}, {cycle_distance:.4f} frame px per cycle')
 
 
 def main():
@@ -317,11 +360,12 @@ def main():
     parser.add_argument('output_dir', type=Path)
     parser.add_argument('names', nargs='*')
     parser.add_argument('--preview', action='store_true')
+    parser.add_argument('--game', action='store_true', help='write registered WebP sheets for Phaser')
     args = parser.parse_args()
     for name in args.names or CONFIG:
         if name not in CONFIG:
             raise SystemExit(f'Unknown enemy "{name}"; choose from {", ".join(CONFIG)}')
-        save(name, args.output_dir, args.preview)
+        save(name, args.output_dir, args.preview, args.game)
 
 
 if __name__ == '__main__':

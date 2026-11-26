@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { MODULE1_LEVEL1, MODULE1_LEVEL2, TEST_LEVEL } from '../combat/levels';
 import { LANE_END_X, LANE_PATHS, VANISHING_POINT, columnX } from '../combat/laneLayout';
-import { CURSED_CLASSROOM, deskShape, enemyArt, themeTextures, walkTimeScale, wizardFeet, type Point } from '../combat/view/theme';
+import { CURSED_CLASSROOM, ENEMY_PUNCH, deskShape, enemyArt, themeTextures, walkFrameAtDistance, wizardFeet, type Point } from '../combat/view/theme';
 
 const LEVELS = [MODULE1_LEVEL1, MODULE1_LEVEL2, TEST_LEVEL];
 
@@ -38,36 +38,46 @@ describe('CURSED_CLASSROOM theme', () => {
         }
     });
 
-    test('every walk spritesheet exists and is exactly frames × frameWidth by frameHeight', () => {
+    test('every walk spritesheet has exactly the declared frame grid', () => {
         const walks = themeTextures(CURSED_CLASSROOM).flatMap(art => (art.walk ? [art.walk] : []));
         expect(walks.length).toBeGreaterThan(0);
         for (const walk of walks) {
             const size = webpSize(readFileSync(`public/assets/combat/enemies/${walk.file}.webp`));
-            expect(size, walk.file).toEqual({ width: walk.frames * walk.frameWidth, height: walk.frameHeight });
+            expect(size.width % walk.frameWidth, walk.file).toBe(0);
+            expect(size.height % walk.frameHeight, walk.file).toBe(0);
+            expect((size.width / walk.frameWidth) * (size.height / walk.frameHeight), walk.file).toBe(walk.frames);
+        }
+    });
+
+    test('walking enemies have two registered eight-pose strikes', () => {
+        for (const art of themeTextures(CURSED_CLASSROOM)) {
+            const walk = art.walk;
+            if (!walk) continue;
+            const size = webpSize(readFileSync('public/assets/combat/enemies/' + art.file + '-attack.webp'));
+            expect(size, art.file).toEqual({
+                width: (walk.frameWidth + ENEMY_PUNCH.leftPadding) * ENEMY_PUNCH.framesPerMotion,
+                height: walk.frameHeight * ENEMY_PUNCH.motions.length,
+            });
         }
     });
 
     test('textbooks have a walk cycle that already faces the wizard', () => {
         const walk = CURSED_CLASSROOM.enemies.textbook.walk;
-        expect(walk?.frames).toBe(12);
+        expect(walk?.frames).toBe(24);
         expect(walk?.faceLeft).toBe(true);
     });
 
-    test('a walk cycle plays at the speed that covers one stride per loop', () => {
-        const art = CURSED_CLASSROOM.enemies.textbook;
-        const walk = art.walk!;
-        const walkMs = MODULE1_LEVEL1.enemyKinds.textbook.walkMs;
-        for (let lane = 0; lane < LANE_PATHS.length; lane++) {
-            const path = LANE_PATHS[lane];
-            const loopMs = (walk.frames / (walk.fps * walkTimeScale(art, lane, walkMs))) * 1000;
-            const loops = walkMs / loopMs;
-            // Number of loops across the lane × stride = lane length at scale 1.
-            expect(loops * walk.stride).toBeCloseTo((path.spawn.x - path.end.x) / path.end.scale, 6);
+    test('walking selects the nearest pose and wraps after one stride', () => {
+        const walks = themeTextures(CURSED_CLASSROOM).flatMap(art => (art.walk ? [art.walk] : []));
+        for (const walk of walks) {
+            const frameDistance = walk.stride / walk.frames;
+            const start = walk.frames - 1;
+            expect(walkFrameAtDistance(walk, 0, start)).toBe(start);
+            expect(walkFrameAtDistance(walk, frameDistance * 0.49, start)).toBe(start);
+            expect(walkFrameAtDistance(walk, frameDistance * 0.51, start)).toBe(0);
+            expect(walkFrameAtDistance(walk, walk.stride / 2, 0)).toBe(walk.frames / 2);
+            expect(walkFrameAtDistance(walk, walk.stride, start)).toBe(start);
         }
-        // Slower walkers animate more slowly; art without a walk cycle is unaffected.
-        expect(walkTimeScale(art, 3, walkMs * 2)).toBeCloseTo(walkTimeScale(art, 3, walkMs) / 2, 9);
-        // [Changed] Was enemies.pencil, which now has a walk cycle; the boss still has none.
-        expect(walkTimeScale(CURSED_CLASSROOM.boss, 3, walkMs)).toBe(1);
     });
 
     test('themeTextures lists each texture once, including the boss', () => {

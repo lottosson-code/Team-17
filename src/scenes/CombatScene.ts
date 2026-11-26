@@ -4,11 +4,11 @@ import { getLevel } from '../combat/levels';
 import type { CombatEvent, Enemy } from '../combat/types';
 import { Battlefield } from '../combat/view/Battlefield';
 import { Effects } from '../combat/view/Effects';
-import { EnemySprite, createWalkAnimations } from '../combat/view/EnemySprite';
+import { EnemySprite } from '../combat/view/EnemySprite';
 import { Hud } from '../combat/view/Hud';
 import { laneDanger, lowHealthLevel } from '../combat/view/hudLogic';
 import { createTextures } from '../combat/view/textures';
-import { CURSED_CLASSROOM, DEPTH, enemyArt, themeTextures, wizardFeet } from '../combat/view/theme';
+import { CURSED_CLASSROOM, DEPTH, ENEMY_PUNCH, enemyArt, enemyPunchTexture, themeTextures, wizardFeet } from '../combat/view/theme';
 import { WizardSprite } from '../combat/view/WizardSprite';
 // [Added] Per-classroom / per-level colours, moon and chalkboard for the battlefield.
 import { classroomTheme } from '../combat/view/classroomThemes';
@@ -48,6 +48,9 @@ export class CombatScene extends Phaser.Scene {
   private typed = '';
   private wavesStarted = 0;
   private paused = false;
+  /** HP deducted by the model for punches whose impact has yet to play. */
+  private pendingPlayerDamage = 0;
+  private pendingDefeat = false;
   /** Resolves the running cutscene's wait for its enemies to finish walking in. */
   private walkInReady: (() => void) | undefined;
   /** [Added] True while the victory panel offers Next Classroom, so the N key works. */
@@ -70,6 +73,8 @@ export class CombatScene extends Phaser.Scene {
     this.typed = '';
     this.wavesStarted = 0;
     this.paused = false;
+    this.pendingPlayerDamage = 0;
+    this.pendingDefeat = false;
     this.walkInReady = undefined;
     this.canGoToNextClassroom = false;
   }
@@ -82,9 +87,16 @@ export class CombatScene extends Phaser.Scene {
     for (const art of themeTextures(THEME)) {
       if (!this.textures.exists(art.texture)) this.load.image(art.texture, `assets/combat/enemies/${art.file}.webp`);
       const walk = art.walk;
-      if (walk && !this.textures.exists(walk.texture)) {
+      if (!walk) continue;
+      if (!this.textures.exists(walk.texture)) {
         this.load.spritesheet(walk.texture, `assets/combat/enemies/${walk.file}.webp`, {
           frameWidth: walk.frameWidth, frameHeight: walk.frameHeight,
+        });
+      }
+      const punch = enemyPunchTexture(art);
+      if (!this.textures.exists(punch)) {
+        this.load.spritesheet(punch, `assets/combat/enemies/${art.file}-attack.webp`, {
+          frameWidth: walk.frameWidth + ENEMY_PUNCH.leftPadding, frameHeight: walk.frameHeight,
         });
       }
     }
@@ -93,7 +105,6 @@ export class CombatScene extends Phaser.Scene {
   create(): void {
     this.time.paused = false;
     createTextures(this);
-    createWalkAnimations(this, themeTextures(THEME));
     this.model = new CombatModel(getLevel(this.moduleId, this.levelId));
 
     // [Changed] Was new Battlefield(this, THEME): each classroom and level now looks slightly different.
@@ -190,10 +201,12 @@ export class CombatScene extends Phaser.Scene {
       sprite.setProblemHidden(this.paused);
     }
 
+    const maxHp = this.model.getPlayerMaxHp();
+    const hp = Math.min(maxHp, this.model.getPlayerHp() + this.pendingPlayerDamage);
     this.battlefield.setLaneDanger(laneDanger(enemies));
-    this.battlefield.setLowHealth(lowHealthLevel(this.model.getPlayerHp(), this.model.getPlayerMaxHp()));
+    this.battlefield.setLowHealth(lowHealthLevel(hp, maxHp));
     this.battlefield.update(time);
-    this.syncHud(time);
+    this.syncHud(time, hp, maxHp);
   }
 
   // ---------------------------------------------------------------- input
@@ -340,12 +353,20 @@ export class CombatScene extends Phaser.Scene {
           this.hud.flashInput('wrong');
           this.wizard.scared();
           break;
-        case 'playerDamaged':
-          this.enemySprites.get(event.enemyId)?.attack();
-          this.wizard.hurt();
-          this.effects.shake(0.007, 160);
-          this.effects.callout(this.wizard.tip().add(new Phaser.Math.Vector2(-60, -110)), `-${event.damage}`, '#ff5c7a');
+        case 'playerDamaged': {
+          this.pendingPlayerDamage += event.hpLost;
+          const impact = () => {
+            this.pendingPlayerDamage -= event.hpLost;
+            this.wizard.hurt();
+            this.effects.shake(0.007, 160);
+            this.effects.callout(this.wizard.tip().add(new Phaser.Math.Vector2(-60, -110)), `-${event.damage}`, '#ff5c7a');
+            this.showDefeatWhenReady();
+          };
+          const sprite = this.enemySprites.get(event.enemyId);
+          if (sprite) sprite.attack(impact);
+          else impact();
           break;
+        }
         case 'announcement':
           this.hud.showBanner(event.text);
           break;
@@ -365,8 +386,8 @@ export class CombatScene extends Phaser.Scene {
           this.showVictory();
           break;
         case 'lost':
-          this.wizard.defeat();
-          this.hud.showOverlay('lost');
+          this.pendingDefeat = true;
+          this.showDefeatWhenReady();
           break;
         // enemySpawned / enemySplit / newProblem / enemyReachedPlayer / cutsceneEnded: update() picks these up.
         // (A split's new enemies get sprites in update(), where the parent stood; its death plays on 'enemyDefeated'.)
@@ -401,11 +422,18 @@ export class CombatScene extends Phaser.Scene {
     return sprite;
   }
 
-  private syncHud(time: number): void {
+  private showDefeatWhenReady(): void {
+    if (!this.pendingDefeat || this.pendingPlayerDamage > 0) return;
+    this.pendingDefeat = false;
+    this.wizard.defeat();
+    this.hud.showOverlay('lost');
+  }
+
+  private syncHud(time: number, hp: number, maxHp: number): void {
     const total = this.model.getWaveMarkers().length;
     this.hud.update({
-      hp: this.model.getPlayerHp(),
-      maxHp: this.model.getPlayerMaxHp(),
+      hp,
+      maxHp,
       progress: this.model.getProgress(),
       waveMarkers: this.model.getWaveMarkers(),
       subtitle: this.wavesStarted === 0 ? `LEVEL ${this.moduleId}-${this.levelId}` : `WAVE ${this.wavesStarted} / ${total}`,

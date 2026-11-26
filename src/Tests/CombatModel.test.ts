@@ -223,11 +223,14 @@ describe('CombatModel', () => {
         expect(model.getPlayerHp()).toBe(60);
     });
 
-    test('the player loses at 0 HP and the model stops', () => {
-        const model = create(level({ playerMaxHp: 20 }));
+    test('the player loses at 0 HP and reports the exact HP lost on the final hit', () => {
+        const model = create(level({ playerMaxHp: 15 }));
         model.tick(16);
         model.tick(1000);
-        expect(types(model.tick(500))).toEqual(['playerDamaged', 'lost']);
+        expect(model.tick(500)).toEqual([
+            { type: 'playerDamaged', enemyId: model.getEnemies()[0].id, damage: 10, hpLost: 5 },
+            { type: 'lost' },
+        ]);
         expect(model.getStatus()).toBe('lost');
         expect(model.getPlayerHp()).toBe(0);
         expect(model.tick(5000)).toEqual([]);

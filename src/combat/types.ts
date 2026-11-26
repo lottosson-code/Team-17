@@ -122,7 +122,7 @@ export type CombatEvent =
     | { type: 'enemyDefeated'; enemyId: number }
     | { type: 'wrongAnswer'; answer: number }
     | { type: 'enemyReachedPlayer'; enemyId: number }
-    | { type: 'playerDamaged'; enemyId: number; damage: number }
+    | { type: 'playerDamaged'; enemyId: number; damage: number; hpLost: number }
     | { type: 'powerUpEarned'; kind: PowerUpKind }
     | { type: 'powerUpUsed'; kind: PowerUpKind; enemyId?: number }
     | { type: 'powerUpExpired'; kind: PowerUpKind }
