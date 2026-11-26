@@ -6,6 +6,7 @@ import { createSettingsModal, SettingsModalController } from '../ui/settingsModa
 import { createQuitModal, QuitModalController } from '../ui/quitModal';
 import { soundManager } from '../audio/soundManager';
 import { mapProgressStore } from '../state/mapProgressStore';
+import { seenEnemiesStore } from '../state/seenEnemiesStore';
 // Remembers the last level played, for the Continue button.
 import { clearLastPlayed, loadLastPlayed, saveLastPlayed } from '../ui/lastPlayed';
 import type { LevelSelection } from '../../map/types.js';
@@ -70,6 +71,8 @@ export class MainMenuScene extends Phaser.Scene {
           newGame: ({ menu }) => {
             soundManager.playSfx('click');
             mapProgressStore.resetProgress();
+            // Every enemy is new again, so their "New enemy" tags show up again.
+            seenEnemiesStore.reset();
             // A new game has no level to continue: forget it and hide Continue.
             clearLastPlayed();
             menu?.update({ hidden: { continue: true } });
