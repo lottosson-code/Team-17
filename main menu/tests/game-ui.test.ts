@@ -14,7 +14,15 @@ it('opens the map, selects classroom 2 / level 4, and returns to the main menu',
   const host = document.createElement('div');
   document.body.append(host);
   const onLevelSelect = vi.fn();
-  const ui = createGameUI(host, { onLevelSelect });
+  let lastUnlockedRoom = 1;
+  let completedFinalLevel = false;
+  const ui = createGameUI(host, {
+    onLevelSelect,
+    map: {
+      isRoomUnlocked: (roomIndex) => roomIndex <= lastUnlockedRoom,
+      isLevelCompleted: (roomIndex, levelNumber) => completedFinalLevel && roomIndex === 1 && levelNumber === 5,
+    },
+  });
   const menu = host.querySelector<HTMLElement>('.cse-main-menu')!;
   const map = host.querySelector<HTMLElement>('.cse-map')!;
   const click = (selector: string): void => {
@@ -47,6 +55,23 @@ it('opens the map, selects classroom 2 / level 4, and returns to the main menu',
     expect(onLevelSelect).toHaveBeenCalledWith({
       roomId: 'classroom-02', levelId: 'classroom-02-level-04', levelNumber: 4, selectionCount: 1,
     });
+
+    // Both a completed Level 5 and an unlocked destination are required.
+    const nextClassroom = () => host.querySelector<HTMLButtonElement>('.cse-map__next-classroom');
+    expect(nextClassroom()).toBeNull();
+    lastUnlockedRoom = 2;
+    ui.showMap(1);
+    expect(nextClassroom()).toBeNull();
+    completedFinalLevel = true;
+    lastUnlockedRoom = 1;
+    ui.showMap(1);
+    expect(nextClassroom()).toBeNull();
+    lastUnlockedRoom = 2;
+    ui.showMap(1);
+    expect(nextClassroom()?.disabled).toBe(false);
+    click('.cse-map__next-classroom');
+    expect(ui.getState().map).toMatchObject({ view: 'islands', roomId: 'classroom-03' });
+    expect(nextClassroom()).toBeNull();
 
     // Checkpoint 4: Back returns to classrooms, then to the existing main menu.
     click('.cse-map__back');

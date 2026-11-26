@@ -6,6 +6,18 @@ export const ASSETS = {
   dream: new URL('./map/dream.png', import.meta.url).href,
   islands: new URL('./map/islands.png', import.meta.url).href,
   bridge: new URL('./map/bridge.png', import.meta.url).href,
+  // [Added] Island-view background and island sprites for classrooms 1, 2, 3 (index = roomIndex).
+  // Classrooms 2 and 3 are recoloured copies made by scripts/make-classroom-variants.py.
+  dreamByRoom: [
+    new URL('./map/dream.png', import.meta.url).href,
+    new URL('./map/dream-2.webp', import.meta.url).href,
+    new URL('./map/dream-3.webp', import.meta.url).href,
+  ],
+  islandsByRoom: [
+    new URL('./map/islands.png', import.meta.url).href,
+    new URL('./map/islands-2.webp', import.meta.url).href,
+    new URL('./map/islands-3.webp', import.meta.url).href,
+  ],
   characters: {
     charcoalBook: new URL('./characters/charcoal-book.png', import.meta.url).href,
     smallEraser: new URL('./characters/small-eraser.png', import.meta.url).href,

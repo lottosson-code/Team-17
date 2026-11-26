@@ -1,5 +1,7 @@
 import { createMainMenu } from './main-menu.js';
 import { createMap } from '../map/index.js';
+// [Added] Shared fade-to-black transition between the menu and the map.
+import { fadeTransition } from '../src/ui/fadeTransition.js';
 import type { GameUIController, GameUIOptions } from './game-ui-types.js';
 
 /** Connect reusable modules. This file has no browser-demo or game logic. */
@@ -20,11 +22,12 @@ export function createGameUI(host: HTMLElement, options: GameUIOptions = {}): Ga
   const menuOptions = options.menu || {};
   const menu = createMainMenu(menuHost, {
     ...menuOptions,
-    callbacks: { ...menuOptions.callbacks, map: () => showMap() },
+    // [Changed] The Map button and the map's Main Menu button now fade through black.
+    callbacks: { ...menuOptions.callbacks, map: () => fadeTransition(() => showMap()) },
   });
   const map = createMap(mapHost, {
     ...options.map,
-    onBackToMenu: showMainMenu,
+    onBackToMenu: () => { void fadeTransition(showMainMenu); },
     onLevelSelect: options.onLevelSelect,
   });
 

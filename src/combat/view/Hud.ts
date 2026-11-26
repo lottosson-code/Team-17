@@ -16,6 +16,14 @@ export interface HudCallbacks {
     onMenu(): void;
     /** Optional callback invoked when the player clicks the prominent Continue button on the victory screen. */
     onContinue?(): void;
+    /** Opens the next classroom map from a Level 5 victory. */
+    onNextClassroom?(): void;
+}
+
+/** Extra choices for the end-of-level panel. */
+export interface OverlayOptions {
+    /** Show a Next Classroom button (only used with 'won'). */
+    nextClassroom?: boolean;
 }
 
 export interface HudState {
@@ -285,7 +293,7 @@ export class Hud {
      * Pause menu or end-of-level panel, with buttons. Pass undefined to close it.
      * With `stats`, the panel also shows the level's statistics between the title and the buttons.
      */
-    showOverlay(kind: 'paused' | 'won' | 'lost' | undefined, stats?: CombatStats): void {
+    showOverlay(kind: 'paused' | 'won' | 'lost' | undefined, stats?: CombatStats, options: OverlayOptions = {}): void {
         this.overlay?.destroy();
         this.overlay = undefined;
         if (!kind) return;
@@ -293,6 +301,8 @@ export class Hud {
         const add = this.scene.add;
         // Full-screen translucent dark backdrop that blocks clicks to the battlefield below
         const dim = add.rectangle(640, 360, 1280, 720, 0x05020c, 0.6).setInteractive();
+        // [Added] Next Classroom only makes sense on a win with a classroom after this one.
+        const showNext = kind === 'won' && options.nextClassroom === true && this.callbacks.onNextClassroom !== undefined;
         const box = add.graphics();
 
         // Check whether we should show the prominent "Continue" button row on the victory screen
@@ -301,7 +311,7 @@ export class Hud {
         // Use a taller panel when the victory screen includes the top Continue button row
         const boxY = hasContinue ? (stats ? 165 : 185) : 210;
         const boxHeight = hasContinue ? (stats ? 415 : 350) : 300;
-        bannerShape(box, 640, boxY, 560, boxHeight);
+        bannerShape(box, 640, boxY, showNext ? 680 : 560, boxHeight);
 
         const titles = { paused: 'PAUSED', won: 'VICTORY!', lost: 'DEFEATED' };
         const colors = { paused: '#f3e6c4', won: '#ffd76a', lost: '#ff6b7a' };
@@ -321,21 +331,20 @@ export class Hud {
         }
 
         // Secondary action row: Play Again & Back to Map (or Resume / Restart / Back to Map when paused)
-        const buttons = kind === 'paused'
-            ? [['Resume', () => this.callbacks.onPause()], ['Restart', () => this.callbacks.onRestart()], ['Back to Map', () => this.callbacks.onMenu()]] as const
-            : [['Play Again', () => this.callbacks.onRestart()], ['Back to Map', () => this.callbacks.onMenu()]] as const;
-
-        const spacing = 190;
-        // Compute the horizontal X position of the first button so the row is centered at X = 640
+        const buttons: (readonly [string, () => void])[] = kind === 'paused'
+            ? [['Resume', () => this.callbacks.onPause()], ['Restart', () => this.callbacks.onRestart()], ['Back to Map', () => this.callbacks.onMenu()]]
+            : [['Play Again', () => this.callbacks.onRestart()], ['Back to Map', () => this.callbacks.onMenu()]];
+        // [Added] Third button on the level 5 victory panel: go on to the next classroom.
+        if (showNext) buttons.push(['Next Classroom', () => this.callbacks.onNextClassroom?.()]);
+        const spacing = showNext ? 205 : 190;
         const first = 640 - ((buttons.length - 1) * spacing) / 2;
         const rowY = hasContinue ? (stats ? 470 : 416) : (stats ? 428 : 410);
         buttons.forEach(([label, action], i) => items.push(menuButton(this.scene, first + i * spacing, rowY, label, action)));
 
-        const hint = kind === 'paused'
-            ? 'Esc to resume'
-            : hasContinue
-                ? 'Enter / C to continue  ·  R to restart  ·  M for map'
-                : 'R to restart  ·  M for map';
+        const shortcuts = ['R to restart', 'M for map'];
+        if (hasContinue) shortcuts.unshift('Enter / C to continue');
+        if (showNext) shortcuts.push('N for next classroom');
+        const hint = kind === 'paused' ? 'Esc to resume' : shortcuts.join('  ·  ');
         const hintY = hasContinue ? (stats ? 536 : 484) : (stats ? 484 : 470);
         items.push(add.text(640, hintY, hint, { fontFamily: 'Lora', fontSize: '16px', color: '#a99ccc' }).setOrigin(0.5));
 

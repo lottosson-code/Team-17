@@ -4,21 +4,27 @@ import { getLevel } from '../combat/levels';
 import type { CombatEvent, Enemy, PowerUpKind } from '../combat/types';
 import { Battlefield } from '../combat/view/Battlefield';
 import { Effects } from '../combat/view/Effects';
-import { EnemySprite, createWalkAnimations } from '../combat/view/EnemySprite';
+import { EnemySprite } from '../combat/view/EnemySprite';
 import { Hud } from '../combat/view/Hud';
 import { laneDanger, lowHealthLevel } from '../combat/view/hudLogic';
 import { meetEnemy, type EnemyIntro } from '../combat/view/enemyIntros';
 import { EnemyInfoCard, NewEnemyTags } from '../combat/view/NewEnemyTags';
 import { seenEnemiesStore } from '../state/seenEnemiesStore';
 import { createTextures } from '../combat/view/textures';
-import { CURSED_CLASSROOM, DEPTH, enemyArt, themeTextures, wizardFeet } from '../combat/view/theme';
+import { CURSED_CLASSROOM, DEPTH, ENEMY_PUNCH, enemyArt, enemyPunchTexture, themeTextures, wizardFeet } from '../combat/view/theme';
 import { WizardSprite } from '../combat/view/WizardSprite';
+// [Added] Per-classroom / per-level colours, moon and chalkboard for the battlefield.
+import { classroomTheme } from '../combat/view/classroomThemes';
 import { mapProgressStore } from '../state/mapProgressStore';
 import { createPauseMenu, type PauseMenuController } from '../../pause menu/index.js';
 import { createSceneOverlay } from '../ui/sceneOverlay';
 import { createSettingsModal, type SettingsModalController } from '../ui/settingsModal';
 import { createQuitModal, type QuitModalController } from '../ui/quitModal';
 import { soundManager } from '../audio/soundManager';
+// [Added] "COMPLETED" banner after the final level.
+import { playCompletedBanner, preloadCompletedBanner } from '../ui/completedBanner';
+// [Added] Shared fade-to-black transition for leaving / restarting the level.
+import { restartSceneWithTransition, startSceneWithTransition } from '../ui/sceneTransition';
 import '../ui/modal.css';
 import '../ui/game-ui.css';
 
@@ -29,6 +35,9 @@ const MAX_INPUT_LENGTH = 4;
 const MAX_FRAME_MS = 100;
 const THEME = CURSED_CLASSROOM;
 const POWER_UP_NAME: Record<PowerUpKind, string> = { freeze: 'Freeze', heal: 'Heal', zap: 'Zap' };
+/** [Added] The boss level that ends each classroom, and how many classrooms there are. */
+const LAST_LEVEL_IN_CLASSROOM = 5;
+const CLASSROOM_COUNT = 3;
 
 export class CombatScene extends Phaser.Scene {
   private moduleId = 1;
@@ -47,8 +56,13 @@ export class CombatScene extends Phaser.Scene {
   private typed = '';
   private wavesStarted = 0;
   private paused = false;
+  /** HP deducted by the model for punches whose impact has yet to play. */
+  private pendingPlayerDamage = 0;
+  private pendingDefeat = false;
   /** Resolves the running cutscene's wait for its enemies to finish walking in. */
   private walkInReady: (() => void) | undefined;
+  /** [Added] True while the victory panel offers Next Classroom, so the N key works. */
+  private canGoToNextClassroom = false;
   /** Animation clock that stops while paused. */
   private animTime = 0;
 
@@ -73,19 +87,31 @@ export class CombatScene extends Phaser.Scene {
     this.wavesStarted = 0;
     this.paused = false;
     this.victoryActive = false;
+    this.pendingPlayerDamage = 0;
+    this.pendingDefeat = false;
     this.walkInReady = undefined;
     this.enemyInfo = undefined;
+    this.canGoToNextClassroom = false;
   }
 
   preload(): void {
     this.load.font('Lora', 'assets/fonts/Lora-Variable.woff', 'woff');
     this.load.font('Poppins', 'assets/fonts/Poppins-Bold.woff', 'woff');
+    // [Added] Art for the "COMPLETED" banner.
+    preloadCompletedBanner(this);
     for (const art of themeTextures(THEME)) {
       if (!this.textures.exists(art.texture)) this.load.image(art.texture, `assets/combat/enemies/${art.file}.webp`);
       const walk = art.walk;
-      if (walk && !this.textures.exists(walk.texture)) {
+      if (!walk) continue;
+      if (!this.textures.exists(walk.texture)) {
         this.load.spritesheet(walk.texture, `assets/combat/enemies/${walk.file}.webp`, {
           frameWidth: walk.frameWidth, frameHeight: walk.frameHeight,
+        });
+      }
+      const punch = enemyPunchTexture(art);
+      if (!this.textures.exists(punch)) {
+        this.load.spritesheet(punch, `assets/combat/enemies/${art.file}-attack.webp`, {
+          frameWidth: walk.frameWidth + ENEMY_PUNCH.leftPadding, frameHeight: walk.frameHeight,
         });
       }
     }
@@ -94,10 +120,11 @@ export class CombatScene extends Phaser.Scene {
   create(): void {
     this.time.paused = false;
     createTextures(this);
-    createWalkAnimations(this, themeTextures(THEME));
     this.model = new CombatModel(getLevel(this.moduleId, this.levelId));
 
-    this.battlefield = new Battlefield(this, THEME);
+    // [Changed] Was new Battlefield(this, THEME): each classroom and level now looks slightly different.
+    // Enemy art, the boss and the desk still come from THEME (they're the same in every variant).
+    this.battlefield = new Battlefield(this, classroomTheme(this.moduleId, this.levelId));
     this.wizard = new WizardSprite(this, wizardFeet(THEME));
     this.effects = new Effects(this);
     this.freezeTint = this.add.rectangle(640, 360, 1280, 720, 0x6fd8ff, 1).setAlpha(0).setDepth(DEPTH.darken);
@@ -107,6 +134,8 @@ export class CombatScene extends Phaser.Scene {
       onRestart: () => this.restart(),
       onMenu: () => this.toMenu(),
       onContinue: () => this.continueToNextLevel(),
+      // [Added] Button on the level 5 victory panel.
+      onNextClassroom: () => this.toNextClassroom(),
     });
     this.enemyTags = new NewEnemyTags(this, THEME, intro => this.openEnemyInfo(intro));
 
@@ -196,7 +225,8 @@ export class CombatScene extends Phaser.Scene {
     });
 
     this.input.keyboard!.on('keydown', (event: KeyboardEvent) => this.onKey(event));
-    this.cameras.main.fadeIn(400, 5, 2, 12);
+    // [Changed] Removed cameras.main.fadeIn(400, 5, 2, 12): the shared fade-to-black transition
+    // (src/ui/fadeTransition.ts) now reveals the level, the same way as every other screen.
 
     this.events.once('shutdown', () => {
       this.settingsModal?.destroy();
@@ -214,7 +244,7 @@ export class CombatScene extends Phaser.Scene {
     if (!this.paused) {
       const dt = Math.min(delta, MAX_FRAME_MS);
       this.animTime += delta;
-      this.handleEvents(this.model.tick(dt));
+      if (!this.victoryActive) this.handleEvents(this.model.tick(dt));
       this.enemyTags.update(dt);
     }
 
@@ -225,10 +255,12 @@ export class CombatScene extends Phaser.Scene {
       sprite.setProblemHidden(this.paused);
     }
 
+    const maxHp = this.model.getPlayerMaxHp();
+    const hp = Math.min(maxHp, this.model.getPlayerHp() + this.pendingPlayerDamage);
     this.battlefield.setLaneDanger(laneDanger(enemies));
-    this.battlefield.setLowHealth(lowHealthLevel(this.model.getPlayerHp(), this.model.getPlayerMaxHp()));
+    this.battlefield.setLowHealth(lowHealthLevel(hp, maxHp));
     this.battlefield.update(time);
-    this.syncHud(time);
+    this.syncHud(time, hp, maxHp);
   }
 
   // ---------------------------------------------------------------- input
@@ -262,6 +294,8 @@ export class CombatScene extends Phaser.Scene {
       }
       if (event.key === 'r' || event.key === 'R') this.restart();
       if (event.key === 'm' || event.key === 'M') this.toMenu();
+      // [Added] N = Next Classroom, only when the victory panel shows that button.
+      if ((event.key === 'n' || event.key === 'N') && this.canGoToNextClassroom) this.toNextClassroom();
       return;
     }
     // No typing while a cutscene plays.
@@ -285,7 +319,7 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private cast(): void {
-    if (this.typed === '' || this.paused || this.model.getStatus() !== 'playing') return;
+    if (this.typed === '' || this.paused || this.victoryActive || this.model.getStatus() !== 'playing') return;
     const answer = Number(this.typed);
     this.typed = '';
     this.handleEvents(this.model.submit(answer));
@@ -324,7 +358,7 @@ export class CombatScene extends Phaser.Scene {
   /** A "New enemy" tag was clicked: pause and describe the enemy. Returns false if it can't open now. */
   private openEnemyInfo(intro: EnemyIntro): boolean {
     const status = this.model.getStatus();
-    if (this.paused || status === 'won' || status === 'lost') return false;
+    if (this.paused || this.victoryActive || status === 'won' || status === 'lost') return false;
     this.pauseGame(false);
     this.enemyInfo = new EnemyInfoCard(this, intro, enemyArt(THEME, intro.art), () => this.closeEnemyInfo());
     return true;
@@ -337,13 +371,13 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private triggerVictory(): void {
+    if (this.victoryActive) return;
     if (this.paused) {
       this.unpauseGame();
     }
-    this.victoryActive = true;
     soundManager.playSfx('start');
     mapProgressStore.completeLevel(this.moduleId, this.levelId);
-    this.hud.showOverlay('won', this.model.getStats());
+    this.showVictory();
   }
 
   /**
@@ -355,13 +389,13 @@ export class CombatScene extends Phaser.Scene {
     soundManager.playSfx('start');
     this.time.paused = false;
 
-    if (this.levelId < 5) {
-      this.scene.restart({ moduleId: this.moduleId, levelId: this.levelId + 1 });
+    if (this.levelId < LAST_LEVEL_IN_CLASSROOM) {
+      void restartSceneWithTransition(this, { moduleId: this.moduleId, levelId: this.levelId + 1 });
       return;
     }
 
-    if (this.moduleId < 3) {
-      this.scene.restart({ moduleId: this.moduleId + 1, levelId: 1 });
+    if (this.moduleId < CLASSROOM_COUNT) {
+      void restartSceneWithTransition(this, { moduleId: this.moduleId + 1, levelId: 1 });
       return;
     }
 
@@ -369,14 +403,46 @@ export class CombatScene extends Phaser.Scene {
     this.toMenu();
   }
 
+  /**
+   * [Added] Shows the victory panel. Level 5 of classrooms 1-2 gets a Next Classroom button;
+   * level 5 of the last classroom first plays the "COMPLETED" banner, then shows the panel.
+   */
+  private showVictory(): void {
+    this.victoryActive = true;
+    const model = this.model;
+    const stats = model.getStats();
+    const finishedClassroom = this.levelId === LAST_LEVEL_IN_CLASSROOM;
+    const hasNextClassroom = finishedClassroom && this.moduleId < CLASSROOM_COUNT;
+    this.canGoToNextClassroom = hasNextClassroom;
+    if (finishedClassroom && !hasNextClassroom) {
+      void playCompletedBanner(this).then(() => {
+        // Skip if the player already left (restart / map) while the banner played.
+        if (this.model === model && this.sys.isActive()) this.hud.showOverlay('won', stats);
+      });
+      return;
+    }
+    this.hud.showOverlay('won', stats, { nextClassroom: hasNextClassroom });
+  }
+
+  /** [Added] Opens the map on the next classroom's islands (completing level 5 already unlocked its level 1). */
+  private toNextClassroom(): void {
+    if (this.moduleId >= CLASSROOM_COUNT) return;
+    this.time.paused = false;
+    soundManager.playSfx('click');
+    // roomIndex is 0-based, so the next classroom's index equals this moduleId.
+    void startSceneWithTransition(this, 'MainMenu', { showMap: true, roomIndex: this.moduleId });
+  }
+
   private restart(): void {
     this.time.paused = false;
-    this.scene.restart({ moduleId: this.moduleId, levelId: this.levelId });
+    // [Changed] Was this.scene.restart(...); now behind the shared fade-to-black transition.
+    void restartSceneWithTransition(this, { moduleId: this.moduleId, levelId: this.levelId });
   }
 
   private toMenu(): void {
     this.time.paused = false;
-    this.scene.start('MainMenu', { showMap: true, roomIndex: this.moduleId - 1 });
+    // [Changed] Was this.scene.start(...); now behind the shared fade-to-black transition.
+    void startSceneWithTransition(this, 'MainMenu', { showMap: true, roomIndex: this.moduleId - 1 });
   }
 
   // ---------------------------------------------------------------- events
@@ -400,12 +466,20 @@ export class CombatScene extends Phaser.Scene {
           this.hud.flashInput('wrong');
           this.wizard.scared();
           break;
-        case 'playerDamaged':
-          this.enemySprites.get(event.enemyId)?.attack();
-          this.wizard.hurt();
-          this.effects.shake(0.007, 160);
-          this.effects.callout(this.wizard.tip().add(new Phaser.Math.Vector2(-60, -110)), `-${event.damage}`, '#ff5c7a');
+        case 'playerDamaged': {
+          this.pendingPlayerDamage += event.hpLost;
+          const impact = () => {
+            this.pendingPlayerDamage -= event.hpLost;
+            this.wizard.hurt();
+            this.effects.shake(0.007, 160);
+            this.effects.callout(this.wizard.tip().add(new Phaser.Math.Vector2(-60, -110)), `-${event.damage}`, '#ff5c7a');
+            this.showDefeatWhenReady();
+          };
+          const sprite = this.enemySprites.get(event.enemyId);
+          if (sprite) sprite.attack(impact);
+          else impact();
           break;
+        }
         case 'announcement':
           this.hud.showBanner(event.text);
           break;
@@ -432,11 +506,11 @@ export class CombatScene extends Phaser.Scene {
           break;
         case 'won':
           mapProgressStore.completeLevel(this.moduleId, this.levelId);
-          this.hud.showOverlay('won', this.model.getStats());
+          this.showVictory();
           break;
         case 'lost':
-          this.wizard.defeat();
-          this.hud.showOverlay('lost', this.model.getStats());
+          this.pendingDefeat = true;
+          this.showDefeatWhenReady();
           break;
         // enemySpawned / enemySplit / newProblem / enemyReachedPlayer / cutsceneEnded: update() picks these up.
         // (A split's new enemies get sprites in update(), where the parent stood; its death plays on 'enemyDefeated'.)
@@ -494,16 +568,23 @@ export class CombatScene extends Phaser.Scene {
     return sprite;
   }
 
-  private syncHud(time: number): void {
+  private showDefeatWhenReady(): void {
+    if (!this.pendingDefeat || this.pendingPlayerDamage > 0) return;
+    this.pendingDefeat = false;
+    this.wizard.defeat();
+    this.hud.showOverlay('lost', this.model.getStats());
+  }
+
+  private syncHud(time: number, hp: number, maxHp: number): void {
     const total = this.model.getWaveMarkers().length;
     this.hud.update({
-      hp: this.model.getPlayerHp(),
-      maxHp: this.model.getPlayerMaxHp(),
+      hp,
+      maxHp,
       progress: this.model.getProgress(),
       waveMarkers: this.model.getWaveMarkers(),
       subtitle: this.wavesStarted === 0 ? `LEVEL ${this.moduleId}-${this.levelId}` : `WAVE ${this.wavesStarted} / ${total}`,
       typed: this.typed,
-      inputEnabled: this.model.getStatus() === 'playing' && !this.paused,
+      inputEnabled: this.model.getStatus() === 'playing' && !this.paused && !this.victoryActive,
       powerUps: this.model.getInventory(),
     }, time);
   }

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { project } from '../laneLayout';
 import { problemText } from '../problems';
 import type { Enemy } from '../types';
-import { walkTimeScale, type EnemyArt } from './theme';
+import { ENEMY_PUNCH, enemyPunchTexture, walkFrameAtDistance, type EnemyArt } from './theme';
 import { TEX } from './textures';
 
 // One enemy on the battlefield: art, shadow, and the problem bubble with its HP bar.
@@ -17,28 +17,9 @@ const BUBBLE_DEPTH = 900;
 const WALK_SPEED = 0.011; // Steps per ms, roughly
 const HP_HEIGHT = 8;
 
-/** Animation key for an enemy art's walk cycle. */
-export function walkAnimationKey(art: EnemyArt): string {
-    return `${art.walk?.texture ?? art.texture}-walk`;
-}
-
-/** Registers the walk animation for each art that has one (once per game). */
-export function createWalkAnimations(scene: Phaser.Scene, arts: EnemyArt[]): void {
-    for (const art of arts) {
-        if (!art.walk || scene.anims.exists(walkAnimationKey(art))) continue;
-        scene.anims.create({
-            key: walkAnimationKey(art),
-            frames: scene.anims.generateFrameNumbers(art.walk.texture, { start: 0, end: art.walk.frames - 1 }),
-            frameRate: art.walk.fps,
-            repeat: -1,
-        });
-    }
-}
-
 export class EnemySprite {
     readonly container: Phaser.GameObjects.Container;
-    /** A Sprite playing the walk cycle when the art has one, otherwise the still image. */
-    private readonly body: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
+    private readonly body: Phaser.GameObjects.Image;
     private readonly shadow: Phaser.GameObjects.Image;
     private readonly bubble: Phaser.GameObjects.Container;
     private readonly panel: Phaser.GameObjects.Graphics;
@@ -49,8 +30,8 @@ export class EnemySprite {
     private readonly shadowScaleX: number;
     /** Distance from the centre to the left side of the art, at scale 1. */
     private readonly halfWidth: number;
-    /** Walk cycle speed that matches this enemy's walking speed in its lane. */
-    private readonly walkScale: number;
+    private readonly spawnX: number;
+    private readonly walkStartFrame: number;
     private readonly phase = Math.random() * Math.PI * 2;
 
     private shownText = '';
@@ -59,6 +40,8 @@ export class EnemySprite {
     /** True while a hit/attack tween owns the body's position. */
     private busy = false;
     private dying = false;
+    private nextPunch = 0;
+    private punch?: { variant: number; startTime?: number; impact?: () => void };
 
     constructor(private readonly scene: Phaser.Scene, enemy: Readonly<Enemy>, readonly art: EnemyArt) {
         const walk = art.walk;
@@ -70,11 +53,12 @@ export class EnemySprite {
         // The art is trimmed to its edges, so half its width is where its left side is.
         this.halfWidth = width / 2;
         this.shadowScaleX = (width * 0.95) / 128;
-        this.walkScale = walkTimeScale(art, enemy.lane, enemy.kind.walkMs);
+        this.spawnX = project(enemy.lane, 0, this.halfWidth).x;
+        this.walkStartFrame = Math.floor(Math.random() * (walk?.frames ?? 1));
 
         this.shadow = scene.add.image(0, 0, TEX.glow).setTint(0x000000).setAlpha(0.6).setScale(this.shadowScaleX, 0.3);
         this.body = walk
-            ? scene.add.sprite(0, 0, walk.texture, 0).setFlipX(!walk.faceLeft)
+            ? scene.add.image(0, 0, walk.texture, 0).setFlipX(!walk.faceLeft)
             : scene.add.image(0, 0, art.texture).setFlipX(!art.faceLeft);
         this.body.setOrigin(0.5, 1).setScale(this.bodyScale);
 
@@ -119,11 +103,30 @@ export class EnemySprite {
         const moving = enemy.progress !== this.lastProgress;
         this.lastProgress = enemy.progress;
 
-        if (this.body instanceof Phaser.GameObjects.Sprite) {
-            const key = walkAnimationKey(this.art);
-            if (moving && !this.body.anims.isPlaying) this.body.play({ key, startFrame: Math.floor(Math.random() * 4), timeScale: this.walkScale });
-            if (!moving && this.body.anims.isPlaying) this.body.anims.stop();
-            if (!this.busy) this.body.angle = moving ? 0 : Math.sin((time * WALK_SPEED + this.phase) * 0.5) * 2;
+        if (this.punch) {
+            const punch = this.punch;
+            const motion = ENEMY_PUNCH.motions[punch.variant];
+            const elapsed = time - (punch.startTime ??= time);
+            if (elapsed < motion.durationMs) {
+                const pose = Math.floor((elapsed / motion.durationMs) * ENEMY_PUNCH.framesPerMotion);
+                this.body.setFrame(punch.variant * ENEMY_PUNCH.framesPerMotion + pose);
+                if (pose >= motion.contactPose) {
+                    const impact = punch.impact;
+                    punch.impact = undefined;
+                    impact?.();
+                }
+                return;
+            }
+            this.finishPunch();
+        }
+
+        const walk = this.art.walk;
+        if (walk) {
+            // Sample from actual lane travel so cutscenes, pauses and uneven frame times keep the phase.
+            const distance = (this.spawnX - x) / (scale * this.bodyScale);
+            const frame = enemy.state === 'attacking' ? 0 : walkFrameAtDistance(walk, distance, this.walkStartFrame);
+            if (Number(this.body.frame.name) !== frame) this.body.setFrame(frame);
+            if (!this.busy) this.body.angle = 0;
         } else if (!this.busy) {
             const t = time * WALK_SPEED + this.phase;
             if (moving) {
@@ -156,6 +159,7 @@ export class EnemySprite {
     }
 
     hit(): void {
+        this.finishPunch();
         this.body.setTintFill(0xffffff);
         this.scene.time.delayedCall(70, () => this.body.active && this.body.clearTint());
         this.busy = true;
@@ -167,14 +171,42 @@ export class EnemySprite {
         });
     }
 
-    attack(): void {
-        if (this.dying) return;
-        this.busy = true;
+    attack(onImpact: () => void): void {
+        if (this.dying) {
+            onImpact();
+            return;
+        }
+        this.finishPunch();
         this.scene.tweens.killTweensOf(this.body);
+        const walk = this.art.walk;
+        const texture = enemyPunchTexture(this.art);
+        if (walk && this.scene.textures.exists(texture)) {
+            const variant = this.nextPunch;
+            this.nextPunch = (variant + 1) % ENEMY_PUNCH.motions.length;
+            this.punch = { variant, impact: onImpact };
+            this.busy = false;
+            const padding = ENEMY_PUNCH.leftPadding;
+            const originX = (walk.frameWidth / 2 + padding) / (walk.frameWidth + padding);
+            this.body.setTexture(texture, variant * ENEMY_PUNCH.framesPerMotion)
+                .setFlipX(false).setOrigin(originX, 1).setPosition(0, 0).setScale(this.bodyScale).setAngle(0);
+            return;
+        }
+
+        onImpact();
+        this.busy = true;
         this.scene.tweens.add({
             targets: this.body, x: -38, angle: -14, duration: 120, yoyo: true, ease: 'Back.easeIn',
             onComplete: () => { this.body.x = 0; this.busy = false; },
         });
+    }
+
+    private finishPunch(): void {
+        const punch = this.punch;
+        const walk = this.art.walk;
+        if (!punch || !walk) return;
+        this.punch = undefined;
+        this.body.setTexture(walk.texture, 0).setFlipX(!walk.faceLeft).setOrigin(0.5, 1);
+        punch.impact?.();
     }
 
     /** The boss rewrote this enemy's problem. */
@@ -185,6 +217,7 @@ export class EnemySprite {
     }
 
     die(): void {
+        this.finishPunch();
         this.dying = true;
         this.scene.tweens.killTweensOf([this.body, this.bubble, this.container]);
         this.scene.tweens.add({ targets: this.bubble, alpha: 0, y: this.bubble.y - 20, duration: 200, onComplete: () => this.bubble.destroy() });
