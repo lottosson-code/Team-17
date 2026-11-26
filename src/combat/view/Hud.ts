@@ -332,7 +332,7 @@ export class Hud {
 }
 
 /** Dark panel with a light border and corner diamonds, centred on cx. */
-function bannerShape(g: Phaser.GameObjects.Graphics, cx: number, y: number, w: number, h: number): void {
+export function bannerShape(g: Phaser.GameObjects.Graphics, cx: number, y: number, w: number, h: number): void {
     const x = cx - w / 2;
     g.fillStyle(0x000000, 0.4).fillRoundedRect(x + 4, y + 6, w, h, 14);
     g.fillGradientStyle(0x1f1a3d, 0x1f1a3d, 0x100c22, 0x100c22, 0.96).fillRoundedRect(x, y, w, h, 14);
@@ -365,7 +365,7 @@ function pressable(target: Phaser.GameObjects.Container, action: () => void): vo
     });
 }
 
-function menuButton(scene: Phaser.Scene, x: number, y: number, label: string, action: () => void): Phaser.GameObjects.Container {
+export function menuButton(scene: Phaser.Scene, x: number, y: number, label: string, action: () => void): Phaser.GameObjects.Container {
     const text = scene.add.text(0, 0, label, { fontFamily: 'Lora', fontSize: '21px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
     const w = Math.max(160, text.width + 36);
     const bg = scene.add.graphics();
