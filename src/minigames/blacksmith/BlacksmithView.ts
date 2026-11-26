@@ -321,6 +321,18 @@ export class BlacksmithView implements BlacksmithViewInterface {
 
         group.add(rect);
         group.add(text);
+
+        group.on('mouseenter', () => {
+            if (typeof document !== 'undefined') {
+                document.body.style.cursor = 'pointer';
+            }
+        });
+        group.on('mouseleave', () => {
+            if (typeof document !== 'undefined') {
+                document.body.style.cursor = 'default';
+            }
+        });
+
         return group;
     }
 
@@ -501,6 +513,16 @@ export class BlacksmithView implements BlacksmithViewInterface {
 
             boxGroup.on('click tap', () => {
                 this.selectInputBox(item.id);
+            });
+            boxGroup.on('mouseenter', () => {
+                if (typeof document !== 'undefined') {
+                    document.body.style.cursor = 'pointer';
+                }
+            });
+            boxGroup.on('mouseleave', () => {
+                if (typeof document !== 'undefined') {
+                    document.body.style.cursor = 'default';
+                }
             });
 
             this.answersGroup.add(boxGroup);
