@@ -45,6 +45,15 @@ export class BlacksmithController {
             this.handleBackToMap();
         });
 
+        this.view.onBackToMap(() => {
+            this.handleBackToMap();
+        });
+
+        // Track opening of tutorial
+        this.view.onShowTutorial(() => {
+            // game has no time limit so no need to pause/resume anything, just log the event
+        });
+
         this.refreshView();
     }
 

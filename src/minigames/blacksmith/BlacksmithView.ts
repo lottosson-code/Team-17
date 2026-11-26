@@ -46,6 +46,7 @@ export interface BlacksmithViewInterface {
     onTypeGuess(callback: (itemId: ItemId, rawText: string) => void): void;
     onSubmitForge(callback: () => void): void;
     onBackToMap(callback: () => void): void;
+    onShowTutorial(callback: () => void): void;
 }
 
 /**
@@ -58,8 +59,10 @@ export class BlacksmithView implements BlacksmithViewInterface {
     private answersGroup: Konva.Group;
     private feedbackText: Konva.Text;
     private statsText: Konva.Text;
+    private tutorialGroup: Konva.Group;
 
     private selectedItem: ItemId | null = null;
+    private tutorialVisible: boolean = false;
     private typedInputs: Record<ItemId, string> = {
         feather: '',
         potion: '',
@@ -199,6 +202,92 @@ export class BlacksmithView implements BlacksmithViewInterface {
             align: 'center',
         });
         this.rootGroup.add(this.feedbackText);
+
+        // "How to Play" toggle button (Positioned next to Back to Map)
+        const tutorialBtn = this.createButton(155, 20, 120, 36, 'How To Play');
+        tutorialBtn.on('click tap', () => {
+            this.playSound(clickSoundUrl);
+            this.toggleTutorial(true);
+            if (this.showTutorialCallback) {
+                this.showTutorialCallback();
+            }
+        });
+        this.rootGroup.add(tutorialBtn);
+
+        // Build Tutorial Overlay Group
+        this.tutorialGroup = new Konva.Group({ x: 0, y: 0, visible: false });
+        this.rootGroup.add(this.tutorialGroup);
+
+        // Dark Semi-transparent background
+        const overlay = new Konva.Rect({
+            x: 0,
+            y: 0,
+            width: width,
+            height: height,
+            fill: '#000000',
+            opacity: 0.75,
+        });
+        this.tutorialGroup.add(overlay);
+
+        // Popup Box
+        const popupWidth = 440;
+        const popupHeight = 420;
+        const popup = new Konva.Rect({
+            x: width / 2 - popupWidth / 2,
+            y: height / 2 - popupHeight / 2,
+            width: popupWidth,
+            height: popupHeight,
+            fill: COLOR_PARCHMENT,
+            stroke: COLOR_WOOD_BORDER,
+            strokeWidth: 6,
+            cornerRadius: 8,
+        });
+        this.tutorialGroup.add(popup);
+
+        // Content Position Helpers
+        const popupX = width / 2 - popupWidth / 2;
+        const popupY = height / 2 - popupHeight / 2;
+
+        // Tutorial Title
+        const tutorialTitle = new Konva.Text({
+            x: popupX + 20,
+            y: popupY + 25,
+            width: popupWidth - 40,
+            text: 'HOW TO PLAY',
+            fontFamily: FONT_FAMILY,
+            fontSize: 24,
+            fontStyle: 'bold',
+            fill: '#2b1d0e',
+            align: 'center',
+        });
+        this.tutorialGroup.add(tutorialTitle);
+
+        // Instructions List
+        const instructions = new Konva.Text({
+            x: popupX + 40,
+            y: popupY + 75,
+            width: popupWidth - 80,
+            text: 
+                "1. Examine the math formulas drawn on the chalkboard.\n\n" +
+                "2. Determine the secret number value of each active ingredient icon.\n\n" +
+                "3. Click on the input box below each item and type your guess on the keyboard.\n\n" +
+                "4. Hit 'FORGE ARMOR' to validate. Solve correctly to permanently boost your stats!",
+            fontFamily: FONT_FAMILY,
+            fontSize: 15,
+            lineHeight: 1.4,
+            fill: '#3d2b1f',
+        });
+        this.tutorialGroup.add(instructions);
+
+        // Got It / Close button
+        const closeBtnX = width / 2 - 75;
+        const closeBtnY = popupY + popupHeight - 75;
+        const closeBtn = this.createButton(closeBtnX, closeBtnY, 150, 44, 'Got It!');
+        closeBtn.on('click tap', () => {
+            this.playSound(clickSoundUrl);
+            this.toggleTutorial(false);
+        });
+        this.tutorialGroup.add(closeBtn);
 
         this.setupKeyboardInput();
     }
@@ -506,6 +595,21 @@ export class BlacksmithView implements BlacksmithViewInterface {
         if (layer !== null) {
             layer.batchDraw();
         }
+    }
+
+    private showTutorialCallback: (() => void) | null = null;
+
+    private toggleTutorial(visible: boolean): void {
+        this.tutorialVisible = visible;
+        this.tutorialGroup.visible(visible);
+        const layer = this.rootGroup.getLayer();
+        if (layer !== null) {
+            layer.batchDraw();
+        }
+    }
+
+    public onShowTutorial(callback: () => void): void {
+        this.showTutorialCallback = callback;
     }
 
     public onSelectDifficulty(callback: (difficulty: Difficulty) => void): void {
