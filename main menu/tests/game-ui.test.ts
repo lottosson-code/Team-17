@@ -2,10 +2,18 @@
 import { expect, it, vi } from 'vitest';
 import { createGameUI, createMainMenu } from '../index';
 
-it('opens the map, selects classroom 2 / level 4, and returns to the main menu', async () => {
-  // jsdom supplies real HTML elements, but not getAnimations or matchMedia; both are stubbed here.
+function stubMapAnimations(): () => void {
   const originalAnimations = Object.getOwnPropertyDescriptor(Element.prototype, 'getAnimations');
   Object.defineProperty(Element.prototype, 'getAnimations', { configurable: true, value: () => [] });
+  return () => {
+    if (originalAnimations) Object.defineProperty(Element.prototype, 'getAnimations', originalAnimations);
+    else Reflect.deleteProperty(Element.prototype, 'getAnimations');
+  };
+}
+
+it('opens the map, selects classroom 2 / level 4, and returns to the main menu', async () => {
+  // jsdom supplies real HTML elements, but not getAnimations or matchMedia.
+  const restoreAnimations = stubMapAnimations();
   vi.stubGlobal('matchMedia', (query: string) => ({
     matches: true, media: query, onchange: null,
     addListener: vi.fn(), removeListener: vi.fn(),
@@ -86,8 +94,50 @@ it('opens the map, selects classroom 2 / level 4, and returns to the main menu',
     ui.destroy();
     host.remove();
     vi.unstubAllGlobals();
-    if (originalAnimations) Object.defineProperty(Element.prototype, 'getAnimations', originalAnimations);
-    else Reflect.deleteProperty(Element.prototype, 'getAnimations');
+    restoreAnimations();
+  }
+});
+
+it('renders distinct classroom art and an SVG outline for every level and minigame', () => {
+  const restoreAnimations = stubMapAnimations();
+  const host = document.createElement('div');
+  document.body.append(host);
+  const ui = createGameUI(host);
+
+  try {
+    ui.showMap();
+    const previews = [...host.querySelectorAll<HTMLImageElement>('.cse-map__room-preview')];
+    expect(previews).toHaveLength(3);
+    expect(new Set(previews.map(image => image.src)).size).toBe(3);
+
+    const backgrounds = new Set<string>();
+    const sprites = new Set<string>();
+    const outlines = new Set<string>();
+    for (let room = 0; room < previews.length; room++) {
+      ui.showMap(room);
+      const background = host.querySelector<HTMLImageElement>('.cse-map__background')!;
+      expect(background.getAttribute('src')).toBeTruthy();
+      backgrounds.add(background.src);
+
+      const islands = [...host.querySelectorAll('.cse-map__island')];
+      expect(islands.filter(island => island.getAttribute('data-route') === 'main')).toHaveLength(5);
+      expect(islands.filter(island => island.getAttribute('data-route') === 'branch')).toHaveLength(3);
+      for (const island of islands) {
+        const sprite = island.querySelector<HTMLImageElement>('.cse-map__sprite')!;
+        const path = island.querySelector('svg .cse-map__island-outline')?.getAttribute('d');
+        expect(sprite.getAttribute('src')).toBeTruthy();
+        expect(path).toMatch(/^M.+Z$/);
+        sprites.add(sprite.src);
+        outlines.add(path!);
+      }
+    }
+    expect(backgrounds.size).toBe(3);
+    expect(sprites.size).toBe(24);
+    expect(outlines.size).toBe(24);
+  } finally {
+    ui.destroy();
+    host.remove();
+    restoreAnimations();
   }
 });
 
