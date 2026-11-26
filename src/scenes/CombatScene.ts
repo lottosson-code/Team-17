@@ -14,6 +14,7 @@ import { mapProgressStore } from '../state/mapProgressStore';
 import { createPauseMenu, type PauseMenuController } from '../../pause menu/index.js';
 import { createSceneOverlay } from '../ui/sceneOverlay';
 import { createSettingsModal, type SettingsModalController } from '../ui/settingsModal';
+import { createQuitModal, type QuitModalController } from '../ui/quitModal';
 import { soundManager } from '../audio/soundManager';
 import '../ui/modal.css';
 import '../ui/game-ui.css';
@@ -46,6 +47,9 @@ export class CombatScene extends Phaser.Scene {
 
   private pauseMenu: PauseMenuController | null = null;
   private settingsModal: SettingsModalController | null = null;
+  private quitModal: QuitModalController | null = null;
+  /** Tracks whether the victory screen is currently active (either via normal win or Dev shortcut). */
+  private victoryActive = false;
   private overlayHost: { element: HTMLElement; destroy: () => void } | null = null;
 
   constructor() {
@@ -59,6 +63,7 @@ export class CombatScene extends Phaser.Scene {
     this.typed = '';
     this.wavesStarted = 0;
     this.paused = false;
+    this.victoryActive = false;
     this.walkInReady = undefined;
   }
 
@@ -90,6 +95,7 @@ export class CombatScene extends Phaser.Scene {
       onPause: () => this.togglePause(),
       onRestart: () => this.restart(),
       onMenu: () => this.toMenu(),
+      onContinue: () => this.continueToNextLevel(),
     });
 
     const host = createSceneOverlay(this);
@@ -138,9 +144,41 @@ export class CombatScene extends Phaser.Scene {
           });
           if (!signal.aborted) menu.setVisible(true);
         },
-        quit: () => {
-          soundManager.playSfx('click');
-          this.toMenu();
+        quit: async ({ menu, signal }) => {
+          // Play modal open sound and temporarily hide the pause board while the confirmation dialog is shown
+          soundManager.playSfx('modalOpen');
+          menu.setVisible(false);
+
+          // Wait for the player to either confirm quitting or cancel back to the pause menu
+          const confirmed = await new Promise<boolean>((resolve) => {
+            const modal = createQuitModal(host.element, {
+              title: 'Quit to Main Menu?',
+              description:
+                'Are you sure you want to quit this level? Your current battle progress will be lost.',
+              confirmLabel: 'Quit to Menu',
+              confirmImmediate: true,
+              signal,
+              onConfirm: () => {
+                this.quitModal = null;
+                soundManager.playSfx('click');
+                resolve(true);
+              },
+              onCancel: () => {
+                this.quitModal = null;
+                soundManager.playSfx('modalClose');
+                resolve(false);
+              },
+            });
+            this.quitModal = modal;
+          });
+
+          // If confirmed, leave combat and return to the level selection map
+          if (confirmed) {
+            this.toMenu();
+          } else if (!signal.aborted) {
+            // Otherwise, restore the pause menu so the player can keep playing
+            menu.setVisible(true);
+          }
         },
       },
     });
@@ -151,6 +189,8 @@ export class CombatScene extends Phaser.Scene {
     this.events.once('shutdown', () => {
       this.settingsModal?.destroy();
       this.settingsModal = null;
+      this.quitModal?.destroy();
+      this.quitModal = null;
       this.pauseMenu?.destroy();
       this.pauseMenu = null;
       this.overlayHost?.destroy();
@@ -180,7 +220,12 @@ export class CombatScene extends Phaser.Scene {
   // ---------------------------------------------------------------- input
 
   private onKey(event: KeyboardEvent): void {
+    // Ignore scene hotkeys while a child confirmation or settings modal is open
+    if (this.settingsModal || this.quitModal) return;
+
     const status = this.model.getStatus();
+    const isWon = status === 'won' || this.victoryActive;
+
     if (event.key === 'Escape') {
       this.togglePause();
       return;
@@ -190,7 +235,12 @@ export class CombatScene extends Phaser.Scene {
       this.triggerVictory();
       return;
     }
-    if (status === 'won' || status === 'lost' || this.paused) {
+    if (isWon || status === 'lost' || this.paused) {
+      // Allow Enter or C on the victory screen to advance to the next level
+      if (isWon && (event.key === 'Enter' || event.key === 'c' || event.key === 'C')) {
+        this.continueToNextLevel();
+        return;
+      }
       if (event.key === 'r' || event.key === 'R') this.restart();
       if (event.key === 'm' || event.key === 'M') this.toMenu();
       return;
@@ -216,7 +266,7 @@ export class CombatScene extends Phaser.Scene {
 
   private togglePause(): void {
     const status = this.model.getStatus();
-    if (status === 'won' || status === 'lost') return;
+    if (status === 'won' || status === 'lost' || this.victoryActive) return;
     if (this.paused) {
       this.unpauseGame();
     } else {
@@ -245,9 +295,33 @@ export class CombatScene extends Phaser.Scene {
     if (this.paused) {
       this.unpauseGame();
     }
+    this.victoryActive = true;
     soundManager.playSfx('start');
     mapProgressStore.completeLevel(this.moduleId, this.levelId);
     this.hud.showOverlay('won');
+  }
+
+  /**
+   * Advances directly to the next combat level when "Continue" is clicked on the victory overlay.
+   * - Levels 1–4 advance to Level + 1 in the current module.
+   * - Boss Level 5 advances to Level 1 of the next module (or returns to the map if Module 3 is finished).
+   */
+  private continueToNextLevel(): void {
+    soundManager.playSfx('start');
+    this.time.paused = false;
+
+    if (this.levelId < 5) {
+      this.scene.restart({ moduleId: this.moduleId, levelId: this.levelId + 1 });
+      return;
+    }
+
+    if (this.moduleId < 3) {
+      this.scene.restart({ moduleId: this.moduleId + 1, levelId: 1 });
+      return;
+    }
+
+    // If the final boss of the final module is completed, return to the map
+    this.toMenu();
   }
 
   private restart(): void {
