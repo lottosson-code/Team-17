@@ -459,6 +459,22 @@ describe('how-to-play tutorial', () => {
     find<HTMLButtonElement>('[data-action="close-tutorial"]').click();
     expect(tutorial().hidden).toBe(true); // closing works even though saving failed
   });
+
+  it('ignores buttons behind the card while it is open (e.g. reached with Tab)', () => {
+    const onSkip = vi.fn();
+    mountWithTutorial({ numbers: [4, 7, 8, 9], tutorial: 'always', onSkip });
+
+    // Pressing Enter on a focused button behind the card produces a click like this one.
+    find<HTMLButtonElement>('[data-action="skip"]').click();
+    expect(onSkip).not.toHaveBeenCalled();
+    expect(shownValues()).toEqual(['4', '7', '8', '9']);
+    expect(tutorial().hidden).toBe(false);
+
+    // Once the card is closed, the same button works again.
+    find<HTMLButtonElement>('[data-action="close-tutorial"]').click();
+    find<HTMLButtonElement>('[data-action="skip"]').click();
+    expect(onSkip).toHaveBeenCalledWith([4, 7, 8, 9]);
+  });
 });
 
 describe('hints', () => {

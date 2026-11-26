@@ -268,6 +268,10 @@ export function mountMake24(host: HTMLElement, options: Make24Options = {}): Mak
     const button = clickedButton(event.target);
     if (button === null) return;
 
+    // While the how-to-play card is open, only its own buttons work. Tab can still
+    // reach the buttons behind it, and pressing Enter on one would act on the game.
+    if (view.isTutorialShown && !view.isInsideTutorial(button)) return;
+
     const { card, op, difficulty, action } = button.dataset;
     if (card !== undefined) handleMove(model.pickCard(Number(card)));
     else if (op !== undefined) handleMove(model.pickOperation(op as Op));
