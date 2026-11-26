@@ -14,6 +14,7 @@ import failSoundUrl from './assets/fail.mp3';
 import featherImgUrl from './assets/feather.png';
 import potionImgUrl from './assets/potion.png';
 import ingotImgUrl from './assets/ingot.png';
+import blacksmithBgUrl from './assets/blacksmith-bg.jpg';
 
 const ITEM_IMAGES: Record<ItemId, string> = {
     feather: featherImgUrl,
@@ -91,15 +92,36 @@ export class BlacksmithView implements BlacksmithViewInterface {
         this.rootGroup = new Konva.Group({ x: 0, y: 0 });
         layer.add(this.rootGroup);
 
-        // Dark wood background
-        const bg = new Konva.Rect({
+        // Background group (stays behind all UI elements)
+        const bgGroup = new Konva.Group({ x: 0, y: 0 });
+        this.rootGroup.add(bgGroup);
+
+        // Solid fallback while the image loads
+        const bgFallback = new Konva.Rect({
             x: 0,
             y: 0,
             width: width,
             height: height,
             fill: COLOR_BG,
         });
-        this.rootGroup.add(bg);
+        bgGroup.add(bgFallback);
+
+        // Forge background image
+        Konva.Image.fromURL(blacksmithBgUrl, (imgNode) => {
+            imgNode.setAttrs({
+                x: 0,
+                y: 0,
+                width: width,
+                height: height,
+                image: imgNode.image(),
+            });
+            bgGroup.add(imgNode);
+
+            const layer = this.rootGroup.getLayer();
+            if (layer !== null) {
+                layer.batchDraw();
+            }
+        });
 
         // Title text
         const title = new Konva.Text({
@@ -150,7 +172,7 @@ export class BlacksmithView implements BlacksmithViewInterface {
         const chalkboard = new Konva.Rect({
             x: 180,
             y: 80,
-            width: 520,
+            width: 560,
             height: 240,
             fill: COLOR_CHALKBOARD,
             stroke: COLOR_WOOD_BORDER,
@@ -162,14 +184,28 @@ export class BlacksmithView implements BlacksmithViewInterface {
         this.boardGroup = new Konva.Group({ x: 200, y: 105 });
         this.rootGroup.add(this.boardGroup);
 
+        // Backing card for player stats display
+        const statsCard = new Konva.Rect({
+            x: 760,
+            y: 110,
+            width: 175,
+            height: 70,
+            fill: 'rgba(24, 20, 18, 0.75)',
+            stroke: COLOR_WOOD_BORDER,
+            strokeWidth: 3,
+            cornerRadius: 6,
+        });
+        this.rootGroup.add(statsCard);
+
         // Simple player stats display
         this.statsText = new Konva.Text({
-            x: 725,
-            y: 120,
-            width: 200,
+            x: 775,
+            y: 124,
+            width: 150,
             text: 'Defense: 0\nMax HP: 100',
             fontFamily: FONT_FAMILY,
             fontSize: 18,
+            lineHeight: 1.3,
             fill: COLOR_CREAM_TEXT,
         });
         this.rootGroup.add(this.statsText);
