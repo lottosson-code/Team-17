@@ -13,6 +13,8 @@ export interface HudCallbacks {
     onPause(): void;
     onRestart(): void;
     onMenu(): void;
+    /** Optional callback invoked when the player clicks the prominent Continue button on the victory screen. */
+    onContinue?(): void;
 }
 
 export interface HudState {
@@ -285,23 +287,52 @@ export class Hud {
         if (!kind) return;
 
         const add = this.scene.add;
+        // Full-screen translucent dark backdrop that blocks clicks to the battlefield below
         const dim = add.rectangle(640, 360, 1280, 720, 0x05020c, 0.6).setInteractive();
         const box = add.graphics();
-        bannerShape(box, 640, 210, 560, 300);
+
+        // Check whether we should show the prominent "Continue" button row on the victory screen
+        const hasContinue = kind === 'won' && Boolean(this.callbacks.onContinue);
+
+        // Use a taller panel when the victory screen includes the top Continue button row
+        const boxY = hasContinue ? 185 : 210;
+        const boxHeight = hasContinue ? 350 : 300;
+        bannerShape(box, 640, boxY, 560, boxHeight);
+
         const titles = { paused: 'PAUSED', won: 'VICTORY!', lost: 'DEFEATED' };
         const colors = { paused: '#f3e6c4', won: '#ffd76a', lost: '#ff6b7a' };
-        const title = add.text(640, 290, titles[kind], {
+        const titleY = hasContinue ? 248 : 290;
+        const title = add.text(640, titleY, titles[kind], {
             fontFamily: 'Lora', fontSize: '54px', fontStyle: 'bold', color: colors[kind], stroke: '#140818', strokeThickness: 8,
         }).setOrigin(0.5);
+
+        const items: Phaser.GameObjects.GameObject[] = [dim, box, title];
+
+        // On victory, place a prominent wide "Continue" button centered above the secondary row
+        if (hasContinue) {
+            items.push(
+                menuButton(this.scene, 640, 336, 'Continue  ▶', () => this.callbacks.onContinue?.(), true)
+            );
+        }
+
+        // Secondary action row: Play Again & Back to Map (or Resume / Restart / Back to Map when paused)
         const buttons = kind === 'paused'
             ? [['Resume', () => this.callbacks.onPause()], ['Restart', () => this.callbacks.onRestart()], ['Back to Map', () => this.callbacks.onMenu()]] as const
             : [['Play Again', () => this.callbacks.onRestart()], ['Back to Map', () => this.callbacks.onMenu()]] as const;
+
         const spacing = 190;
+        // Compute the horizontal X position of the first button so the row is centered at X = 640
         const first = 640 - ((buttons.length - 1) * spacing) / 2;
-        const items: Phaser.GameObjects.GameObject[] = [dim, box, title];
-        buttons.forEach(([label, action], i) => items.push(menuButton(this.scene, first + i * spacing, 410, label, action)));
-        const hint = kind === 'paused' ? 'Esc to resume' : 'R to restart  ·  M for map';
-        items.push(add.text(640, 470, hint, { fontFamily: 'Lora', fontSize: '16px', color: '#a99ccc' }).setOrigin(0.5));
+        const rowY = hasContinue ? 416 : 410;
+        buttons.forEach(([label, action], i) => items.push(menuButton(this.scene, first + i * spacing, rowY, label, action)));
+
+        const hint = kind === 'paused'
+            ? 'Esc to resume'
+            : hasContinue
+                ? 'Enter / C to continue  ·  R to restart  ·  M for map'
+                : 'R to restart  ·  M for map';
+        const hintY = hasContinue ? 484 : 470;
+        items.push(add.text(640, hintY, hint, { fontFamily: 'Lora', fontSize: '16px', color: '#a99ccc' }).setOrigin(0.5));
 
         this.overlay = add.container(0, 0, items).setDepth(DEPTH.overlay).setAlpha(1);
     }
@@ -365,13 +396,34 @@ function pressable(target: Phaser.GameObjects.Container, action: () => void): vo
     });
 }
 
-function menuButton(scene: Phaser.Scene, x: number, y: number, label: string, action: () => void): Phaser.GameObjects.Container {
-    const text = scene.add.text(0, 0, label, { fontFamily: 'Lora', fontSize: '21px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
-    const w = Math.max(160, text.width + 36);
+/**
+ * Creates an interactive Phaser overlay button.
+ * When `prominent` is true, renders a wider, taller gold-bordered call-to-action button (used for "Continue").
+ */
+function menuButton(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    label: string,
+    action: () => void,
+    prominent = false
+): Phaser.GameObjects.Container {
+    const fontSize = prominent ? '25px' : '21px';
+    const text = scene.add.text(0, 0, label, { fontFamily: 'Lora', fontSize, fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
+    // Make prominent buttons wider (350px minimum, spanning above the two secondary buttons) and slightly taller
+    const w = prominent ? Math.max(350, text.width + 64) : Math.max(160, text.width + 36);
+    const h = prominent ? 58 : 52;
     const bg = scene.add.graphics();
-    bg.fillGradientStyle(0x8350f0, 0x8350f0, 0x4a22a6, 0x4a22a6, 1).fillRoundedRect(-w / 2, -26, w, 52, 12);
-    bg.lineStyle(2.5, 0xc8b4ff).strokeRoundedRect(-w / 2, -26, w, 52, 12);
-    const button = scene.add.container(x, y, [bg, text]).setSize(w, 52).setInteractive({ useHandCursor: true });
+
+    // Prominent buttons get a richer gold-accented border and brighter gradient fill
+    const topColor = prominent ? 0x9b66ff : 0x8350f0;
+    const bottomColor = prominent ? 0x5c2cc9 : 0x4a22a6;
+    const borderColor = prominent ? 0xffd76a : 0xc8b4ff;
+    const borderWidth = prominent ? 3.5 : 2.5;
+
+    bg.fillGradientStyle(topColor, topColor, bottomColor, bottomColor, 1).fillRoundedRect(-w / 2, -h / 2, w, h, 12);
+    bg.lineStyle(borderWidth, borderColor).strokeRoundedRect(-w / 2, -h / 2, w, h, 12);
+    const button = scene.add.container(x, y, [bg, text]).setSize(w, h).setInteractive({ useHandCursor: true });
     pressable(button, action);
     return button;
 }
