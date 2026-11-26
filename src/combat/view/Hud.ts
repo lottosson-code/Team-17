@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { heartFills } from './hudLogic';
+import { heartFills, POWER_UP_TEXTURE } from './hudLogic';
 import { DEPTH } from './theme';
 import { TEX } from './textures';
+import type { PowerUpKind } from '../types';
 
 // The combat HUD: player portrait and hearts, level banner with wave progress, pause button,
 // and the bottom panel with skill slots (empty for now), the answer box and the Cast Spell button.
@@ -22,6 +23,7 @@ export interface HudState {
     subtitle: string; // Under the level name, e.g. "WAVE 1 / 2"
     typed: string;
     inputEnabled: boolean;
+    powerUps: readonly PowerUpKind[]; // The model's inventory; the first one is used by Q
 }
 
 const HEARTS = 5;
@@ -39,6 +41,7 @@ const CAST = { x: 852, y: PANEL_MID - 35, w: 372, h: 70 };
 const SKILL_SLOTS = 3;
 const SKILL = { x: 70, y: PANEL_MID - 38, size: 76, gap: 32 };
 const CREAM = '#efe3c8';
+const POWER_ICON_SCALE = 0.95;
 
 export class Hud {
     private readonly hearts: { full: Phaser.GameObjects.Image }[] = [];
@@ -51,6 +54,9 @@ export class Hud {
     private readonly caret: Phaser.GameObjects.Rectangle;
     private readonly castButton: Phaser.GameObjects.Container;
     private readonly castShine: Phaser.GameObjects.Graphics;
+    private readonly powerIcons: Phaser.GameObjects.Image[] = [];
+    private readonly readyRing: Phaser.GameObjects.Graphics;
+    private readonly useHint: Phaser.GameObjects.Text;
     private readonly banner: Phaser.GameObjects.Text;
     private overlay?: Phaser.GameObjects.Container;
     private shownProgress = 0;
@@ -146,6 +152,23 @@ export class Hud {
             slots.lineStyle(1.5, 0x9a8462, 0.5).strokeRoundedRect(x - 4, SKILL.y - 4, SKILL.size + 8, SKILL.size + 8, 14);
         }
 
+        // Power-up icons sit in the sockets; the first one is the one Q uses.
+        for (let i = 0; i < SKILL_SLOTS; i++) {
+            const icon = add.image(
+                SKILL.x + i * (SKILL.size + SKILL.gap) + SKILL.size / 2, SKILL.y + SKILL.size / 2, POWER_UP_TEXTURE.freeze,
+            ).setScale(POWER_ICON_SCALE).setVisible(false);
+            hud(icon);
+            this.powerIcons.push(icon);
+        }
+        this.readyRing = add.graphics().setVisible(false);
+        hud(this.readyRing);
+        this.readyRing.lineStyle(3, 0xffd76a).strokeRoundedRect(SKILL.x - 6, SKILL.y - 6, SKILL.size + 12, SKILL.size + 12, 15);
+        this.useHint = add.text(SKILL.x + SKILL.size / 2, SKILL.y + SKILL.size + 10, 'Q to use', {
+            fontFamily: 'Lora', fontSize: '12px', fontStyle: 'bold', color: '#d7cdf5',
+        }).setOrigin(0.5).setVisible(false);
+        hud(this.useHint);
+
+
         // Answer box (centre).
         hud(add.text(640, INPUT_LABEL_Y, '✦   Solve to attack!   ✦', { fontFamily: 'Lora', fontSize: '19px', fontStyle: 'bold', color: CREAM })
             .setOrigin(0.5));
@@ -216,6 +239,14 @@ export class Hud {
         this.inputText.setAlpha(state.inputEnabled ? 1 : 0.4);
         this.caret.setX(640 + this.inputText.width / 2 + 6);
         this.caret.setVisible(state.inputEnabled && Math.floor(time / 500) % 2 === 0);
+        this.powerIcons.forEach((icon, i) => {
+            const kind = state.powerUps[i];
+            icon.setVisible(kind !== undefined);
+            if (kind) icon.setTexture(POWER_UP_TEXTURE[kind]);
+        });
+        const holdingOne = state.powerUps.length > 0;
+        this.readyRing.setVisible(holdingOne).setAlpha(0.6 + 0.4 * Math.sin(time * 0.006));
+        this.useHint.setVisible(holdingOne);
     }
 
     /** Green for a hit, red (with a shake) for a wrong answer. */
@@ -229,6 +260,15 @@ export class Hud {
                 onComplete: () => { this.inputFrame.x = 0; this.inputText.x = 640; },
             });
         }
+    }
+
+    /** Bounces the icon in a slot in, e.g. when a power-up is earned. */
+    popPowerUp(slot: number): void {
+        const icon = this.powerIcons[slot];
+        if (!icon) return;
+        this.scene.tweens.killTweensOf(icon);
+        icon.setScale(0.2);
+        this.scene.tweens.add({ targets: icon, scale: POWER_ICON_SCALE, duration: 320, ease: 'Back.easeOut' });
     }
 
     showBanner(text: string, holdMs = 1600): void {

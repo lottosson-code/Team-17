@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { POWER_UP_TEXTURE } from './hudLogic';
 
 // Small textures drawn in code: glows, particles, HUD icons and screen-edge shading.
 // Generated once per game; scenes share them through the texture manager.
@@ -71,6 +72,9 @@ export function createTextures(scene: Phaser.Scene): void {
             ctx.stroke();
         }
     });
+    canvas(scene, POWER_UP_TEXTURE.freeze, 64, 64, snowflake);
+    canvas(scene, POWER_UP_TEXTURE.heal, 64, 64, healCross);
+    canvas(scene, POWER_UP_TEXTURE.zap, 64, 64, lightningBolt);
 }
 
 function canvas(scene: Phaser.Scene, key: string, w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void): void {
@@ -134,4 +138,70 @@ function heart(ctx: CanvasRenderingContext2D, full: boolean): void {
         ctx.ellipse(21, 18, 6, 4, -0.6, 0, Math.PI * 2);
         ctx.fill();
     }
+}
+
+function snowflake(ctx: CanvasRenderingContext2D): void {
+    ctx.translate(32, 32);
+    ctx.lineCap = 'round';
+    // Dark outline first, then the bright ice on top.
+    for (const [width, color] of [[9, '#0b2a4a'], [5, '#bff3ff']] as const) {
+        ctx.lineWidth = width;
+        ctx.strokeStyle = color;
+        for (let arm = 0; arm < 6; arm++) {
+            ctx.save();
+            ctx.rotate((arm * Math.PI) / 3);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, -26);
+            ctx.moveTo(0, -15);
+            ctx.lineTo(-7, -22);
+            ctx.moveTo(0, -15);
+            ctx.lineTo(7, -22);
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function healCross(ctx: CanvasRenderingContext2D): void {
+    const points: [number, number][] = [
+        [22, 6], [42, 6], [42, 22], [58, 22], [58, 42], [42, 42],
+        [42, 58], [22, 58], [22, 42], [6, 42], [6, 22], [22, 22],
+    ];
+    ctx.beginPath();
+    points.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+    ctx.closePath();
+    const gradient = ctx.createLinearGradient(0, 6, 0, 58);
+    gradient.addColorStop(0, '#8dff9f');
+    gradient.addColorStop(1, '#1fa64a');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#0b3a1a';
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.ellipse(28, 14, 4, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function lightningBolt(ctx: CanvasRenderingContext2D): void {
+    const points: [number, number][] = [[36, 2], [12, 36], [28, 36], [20, 62], [52, 24], [35, 24], [46, 2]];
+    ctx.beginPath();
+    points.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+    ctx.closePath();
+    const gradient = ctx.createLinearGradient(0, 2, 0, 62);
+    gradient.addColorStop(0, '#fff6a0');
+    gradient.addColorStop(1, '#ff9a1f');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#4a2a00';
+    ctx.stroke();
 }

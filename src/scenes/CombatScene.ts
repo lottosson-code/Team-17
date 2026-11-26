@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CombatModel } from '../combat/CombatModel';
 import { getLevel } from '../combat/levels';
-import type { CombatEvent, Enemy } from '../combat/types';
+import type { CombatEvent, Enemy, PowerUpKind } from '../combat/types';
 import { Battlefield } from '../combat/view/Battlefield';
 import { Effects } from '../combat/view/Effects';
 import { EnemySprite, createWalkAnimations } from '../combat/view/EnemySprite';
@@ -24,6 +24,7 @@ const MAX_INPUT_LENGTH = 4;
 /** Cap per-frame time so switching tabs doesn't teleport enemies. */
 const MAX_FRAME_MS = 100;
 const THEME = CURSED_CLASSROOM;
+const POWER_UP_NAME: Record<PowerUpKind, string> = { freeze: 'Freeze', heal: 'Heal', zap: 'Zap' };
 
 export class CombatScene extends Phaser.Scene {
   private moduleId = 1;
@@ -47,6 +48,8 @@ export class CombatScene extends Phaser.Scene {
   private pauseMenu: PauseMenuController | null = null;
   private settingsModal: SettingsModalController | null = null;
   private overlayHost: { element: HTMLElement; destroy: () => void } | null = null;
+
+  private freezeTint!: Phaser.GameObjects.Rectangle;
 
   constructor() {
     super('Combat');
@@ -85,6 +88,7 @@ export class CombatScene extends Phaser.Scene {
     this.battlefield = new Battlefield(this, THEME);
     this.wizard = new WizardSprite(this, wizardFeet(THEME));
     this.effects = new Effects(this);
+    this.freezeTint = this.add.rectangle(640, 360, 1280, 720, 0x6fd8ff, 1).setAlpha(0).setDepth(DEPTH.darken);
     this.hud = new Hud(this, THEME.name, {
       onCast: () => this.cast(),
       onPause: () => this.togglePause(),
@@ -308,6 +312,17 @@ export class CombatScene extends Phaser.Scene {
         case 'problemTwisted':
           this.enemySprites.get(event.enemyId)?.popProblem();
           break;
+        case 'powerUpEarned':
+          this.hud.popPowerUp(this.model.getInventory().length - 1);
+          this.effects.callout(this.wizard.tip().add(new Phaser.Math.Vector2(-60, -110)), `${POWER_UP_NAME[event.kind]} ready!`, '#ffd76a');
+          break;
+        case 'powerUpUsed':
+          this.playPowerUp(event.kind, event.enemyId);
+          break;
+        case 'powerUpExpired':
+          this.tweens.killTweensOf(this.freezeTint);
+          this.tweens.add({ targets: this.freezeTint, alpha: 0, duration: 500 });
+          break;
         case 'won':
           mapProgressStore.completeLevel(this.moduleId, this.levelId);
           this.hud.showOverlay('won');
@@ -332,6 +347,26 @@ export class CombatScene extends Phaser.Scene {
     this.effects.impact(target);
     this.effects.correct(target);
     this.effects.damage(target, damage);
+  }
+
+    private playPowerUp(kind: PowerUpKind, enemyId?: number): void {
+    const feet = wizardFeet(THEME);
+    const aboveWizard = new Phaser.Math.Vector2(feet.x, feet.y - 90);
+    if (kind === 'freeze') {
+      this.tweens.killTweensOf(this.freezeTint);
+      this.tweens.add({ targets: this.freezeTint, alpha: 0.22, duration: 250 });
+      this.effects.flash(aboveWizard, 0x9ff3ff, 2.5);
+      this.effects.callout(aboveWizard, 'FROZEN!', '#9ff3ff');
+    } else if (kind === 'heal') {
+      this.effects.flash(aboveWizard, 0x7dff9b, 3);
+      this.effects.callout(aboveWizard, 'HEALED!', '#7dff9b');
+    } else {
+      // The model sends 'enemyDefeated' right after this, which plays the death animation.
+      const sprite = enemyId === undefined ? undefined : this.enemySprites.get(enemyId);
+      if (!sprite) return;
+      this.effects.shake(0.005, 140);
+      this.effects.callout(sprite.centre(), 'ZAP!', '#ffe27a');
+    }
   }
 
   private defeatEnemy(enemyId: number): void {
@@ -359,6 +394,7 @@ export class CombatScene extends Phaser.Scene {
       subtitle: this.wavesStarted === 0 ? `LEVEL ${this.moduleId}-${this.levelId}` : `WAVE ${this.wavesStarted} / ${total}`,
       typed: this.typed,
       inputEnabled: this.model.getStatus() === 'playing' && !this.paused,
+      powerUps: this.model.getInventory(),
     }, time);
   }
 

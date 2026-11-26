@@ -132,6 +132,11 @@ export class Effects {
         this.scene.cameras.main.shake(duration, strength);
     }
 
+    /** A coloured flash, used by power-ups (e.g. green around the wizard when healing). */
+    flash(at: Vec, color: number, scale = 2): void {
+        this.glowBurst(at, color, scale);
+    }
+
     private glowBurst(at: Vec, color: number, scale: number): void {
         const glow = this.scene.add.image(at.x, at.y, TEX.glow).setTint(color).setScale(scale * 0.4)
             .setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.effects + 1);

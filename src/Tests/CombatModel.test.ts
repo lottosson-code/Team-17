@@ -842,7 +842,7 @@ describe('power-ups', () => {
         expect(model.getPlayerHp()).toBe(25);
     });
 
-    test('zap defeats an enemy', () => {
+    test('zap deals ZAP_DAMAGE (30) to an enemy', () => {
         const model = create(powerUpLevel(['zap']));
         solveFirst(model);
         model.usePowerUp();
