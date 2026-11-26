@@ -1,4 +1,5 @@
 import Konva from 'konva';
+import { settingsStore } from '../../state/settingsStore';
 import {
     Difficulty,
     ForgeEquation,
@@ -290,8 +291,13 @@ export class BlacksmithView implements BlacksmithViewInterface {
         if (typeof Audio === 'undefined') {
             return;
         }
+        const { muted, sfxVolume } = settingsStore.getSettings();
+        if (muted || sfxVolume <= 0) {
+            return;
+        }
         try {
             const sound = new Audio(soundPath);
+            sound.volume = sfxVolume / 100;
             sound.play();
         } catch {
             // Ignore audio errors in tests
